@@ -21,9 +21,11 @@ class ModelBasedValueIterationAgent():
         action_index = np.argmax(self.q[state])
         return action_index
     def value_update(self):
-        # for s in range(self.state_space_n):
-        #     self.v[s] = 
-        pass
+        for s in range(self.state_space_n):
+            self.v[s] = max(self.q[s])
+            
+        return
+        # pass
     def policy_update(self, expected_reward, transition_prob):
 
         for s in range(self.state_space_n):
