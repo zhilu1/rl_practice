@@ -1,12 +1,12 @@
 import numpy as np
 from collections import defaultdict
 
-class ModelBasedValueIterationAgent():
+class ValueIterationAgent():
     def __init__(self,
                  action_space_n: int,
                  initial_state_values = None,
                  threshold: float = 0.001,
-                 gamma: float = 0.9
+                 discounted_factor: float = 0.9
                  ) -> None:
         self.v = defaultdict(int)
         self.old_v = defaultdict(int)
@@ -16,9 +16,9 @@ class ModelBasedValueIterationAgent():
         self.threshold = threshold
         self.q = defaultdict(lambda: np.zeros(action_space_n))
         self.policy = defaultdict(lambda: np.zeros(action_space_n))
-        self.gamma = gamma
+        self.discounted_factor = discounted_factor
     def get_action(self, state):
-        action_index = np.argmax(self.q[state])
+        action_index = np.argmax(self.policy[state])
         return action_index
 
     def value_update(self, state):
@@ -35,7 +35,7 @@ class ModelBasedValueIterationAgent():
         # pass
     def q_table_update(self, s, a, expected_immediate_reward, next_state):
         expected_future_reward = self.old_v[next_state]
-        self.q[s][a] = expected_immediate_reward + self.gamma * expected_future_reward
+        self.q[s][a] = expected_immediate_reward + self.discounted_factor * expected_future_reward
         return
     def policy_update(self, state):
         # for state in self.q.keys():
