@@ -1,6 +1,14 @@
 from collections import defaultdict
+# NOTDONE yet
+"""
+1. 设置 episode length?
+2. 计算reward时, 需要将前一步的 state 带入? 看看是否已经在
+3. 总之就是想要让到达 target 过就不能再次获得 reward
+    - 感觉就是一个针对每个 agent 的 state
 
-class GridWorldEnv():
+"""
+
+class EpisodicGridWorldEnv():
     def __init__(self,
                 height,
                 width, 
@@ -10,7 +18,6 @@ class GridWorldEnv():
                 forbidden_reward = -1, 
                 normal_reward = 0,
                 hit_wall_reward = -1,
-                discounted_factor = 0.9
                 ) -> None:
         self.height = height
         self.width = width
@@ -24,8 +31,8 @@ class GridWorldEnv():
         self.possible_actions = len(self._action_space)
         self.transition_probs = defaultdict(lambda: defaultdict(float))
         self.expected_rewards = defaultdict(lambda: defaultdict(float))
-        self.target_grids = target_grids
-        self.discounted_factor = discounted_factor
+        self.backup_rewards = defaultdict(lambda: defaultdict(float))
+        self.is_terminated = False
         
     def init_model_based_transitions(self, certain_transitions={}):
         for i in range(self.height):
@@ -53,8 +60,15 @@ class GridWorldEnv():
                         self.expected_rewards[state][action] = self.hit_wall_reward
                     else:
                         self.expected_rewards[state][action] = self.grids[y][x]
-            
+        self.backup_rewards = self.expected_rewards.copy()
         
+    def termination(self):
+        self.is_terminated = True
+        self.expected_rewards = defaultdict(lambda: defaultdict(float))
+    def restart(self):
+        self.is_terminated = False
+        self.expected_rewards = self.backup_rewards.copy()
+        # self.expected_rewards = self.backup_rewards
 
     def valid_actions(self, state):
         return self.possible_actions
@@ -75,6 +89,11 @@ class GridWorldEnv():
     #                 immediate_reward[(i,j)] = self.grids[y][x]
     #     return total_reward, immediate_reward
     def step(self, state, a):
+        if self.is_terminated:
+            return (i,j), 0
+        if a == 5:
+            self.is_terminated = True
+
         i, j = state
         y, x = i + self._action_space[a][0], j + self._action_space[a][1]
         if x >= self.width or x < 0 or y >= self.height or y < 0:
@@ -88,7 +107,7 @@ class GridWorldEnv():
         for i in range(self.height):
             to_print += "[ "
             for j in range(self.width):
-                to_print += '{:3f}'.format(self.grids[i][j])
+                to_print += '{:3d}'.format(self.grids[i][j])
                 to_print += " "
                 # print(self.grids[i][j], end=" ")
             to_print += "]\n"

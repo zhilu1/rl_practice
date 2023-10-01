@@ -10,14 +10,16 @@ import sys
 # 目前有两个道路, 一是实现 policy iteration 和 truncated policy iteration, 看看是否一致
 # 此外还应该仔细看看老师的 setting, 是否是到了终点能停止, 然后做一个到终点后停止的 environment
                 
+# from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv as GridWorldEnv
 from rl_envs.grid_world_env import GridWorldEnv
 from agents.value_iteration_agent import ValueIterationAgent
 from agents.policy_iteration_agent import TruncatedPolicyIterationAgent
 
-env = GridWorldEnv(3, 4, forbidden_grids=[(1,1), (1,3)], target_grids=[(2,3)])
+env = GridWorldEnv(3, 4, forbidden_grids=[(2,1), (1,3)], target_grids=[(2,3)], forbidden_reward=-10)
+# env = GridWorldEnv(3, 4, forbidden_grids=[(2,1), (1,3)], target_grids=[(2,3)])
 
 
-def print_actions():
+def print_actions(agent, env):
     action_mapping = [" ↓ "," ↑ "," → "," ← "," ↺ "]
     for i in range(env.height):
         print("[", end=" ")
@@ -34,8 +36,6 @@ value iteration play
 
 # amount_update = float('inf')
 # while agent.not_converged(amount_update):
-#     print_actions()
-#     print()
 #     amount_update = 0
 #     for i in range(env.height):
 #         for j in range(env.width):
@@ -48,13 +48,15 @@ value iteration play
 #             amount_update = max(amount_update,agent.value_update(state))
 #     agent.old_v = agent.v.copy()
 
+# print_actions(agent, env)
+# print()
 
 """
 model based policy iteration play
 """
 agent = TruncatedPolicyIterationAgent(action_space_n=env.possible_actions, discounted_factor=0.9, threshold=0.001)
 
-env.model_based_transitions()
+env.init_model_based_transitions()
 agent.initialize_policy()
 
 amount_update = float('inf')
@@ -81,6 +83,7 @@ model free policy iteration play
 """
 # agent = TruncatedPolicyIterationAgent(action_space_n=env.possible_actions, discounted_factor=0.9, threshold=0.0001)
 
+# agent.initialize_policy()
 
 # amount_update = float('inf')
 # while agent.not_converged(amount_update):
@@ -89,16 +92,31 @@ model free policy iteration play
 #         for i in range(env.height):
 #             for j in range(env.width):
 #                 state = (i,j)
-#                 agent.policy_evaluation(state, env.expected_rewards, env.transition_probs)
+#                 agent.v[state] = 0
+#                 for action, action_prob in agent.policy[state].items():
+#                     if action_prob <= 0:
+#                         continue
+#                     next_state, immediate_reward = env.step(state, action)
+#                     s_update = agent.v_update(state, action_prob, immediate_reward, next_state)
+#                     amount_update = max(s_update, amount_update)
+#         agent.old_v = agent.v.copy()
 
-
+#     for i in range(env.height):
+#         for j in range(env.width):
+#             state = (i,j)
+#             agent.q[state] *= 0
+#             for action in range(env.valid_actions(state)):
+#                 next_state, immediate_reward = env.step(state, action)
+#                 agent.q_table_update(state, action, immediate_reward, next_state)
+#             agent.policy_update(state)
+    
 
 """
 output
 """
 print(env)
 
-print_actions()
+print_actions(agent, env)
 
 for i in range(env.height):
     print("[", end=" ")
