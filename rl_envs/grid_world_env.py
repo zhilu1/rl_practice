@@ -88,7 +88,7 @@ class GridWorldEnv():
         for i in range(self.height):
             to_print += "[ "
             for j in range(self.width):
-                to_print += '{:3f}'.format(self.grids[i][j])
+                to_print += '{:2f}'.format(self.grids[i][j])
                 to_print += " "
                 # print(self.grids[i][j], end=" ")
             to_print += "]\n"
