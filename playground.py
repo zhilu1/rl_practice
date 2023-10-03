@@ -1,14 +1,13 @@
 from pathlib import Path
 import sys
 
-# path_root = Path(__file__).parents[2]
-# sys.path.append(str(path_root))
-# print(sys.path)
 
-# agent 的代码看不出什么错误
-# 想想, 关键是在终点无限等待的收益太高了, 所以无论如何都是直接冲终点赚
-# 目前有两个道路, 一是实现 policy iteration 和 truncated policy iteration, 看看是否一致
-# 此外还应该仔细看看老师的 setting, 是否是到了终点能停止, 然后做一个到终点后停止的 environment
+# 关键是在终点无限等待的收益太高了, 所以无论如何都是直接冲终点赚
+# 目前有两个道路, 一是实现 policy iteration 和 truncated policy iteration, 看看是否一致 [结果: 确实一致]
+# 此外还应该仔细看看老师的 setting, 是否是到了终点能停止, 然后做一个到终点后停止的 environment [不是所有方法都能作 episode]
+
+# TODO n-step Sarsa, 两个版本的 Q-learning (一个是 on-policy, 一个 offpolicy 是一口气生成整个 trajectory )
+# 两个 Task, 从每个 state 出发找到位置 和 仅找到一个 state 出发的最优位置
                 
 # from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv as GridWorldEnv
 from rl_envs.grid_world_env import GridWorldEnv
