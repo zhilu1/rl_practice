@@ -1,4 +1,6 @@
 from collections import defaultdict
+from random import randint
+
 
 class GridWorldEnv():
     def __init__(self,
@@ -54,7 +56,8 @@ class GridWorldEnv():
                     else:
                         self.expected_rewards[state][action] = self.grids[y][x]
             
-        
+    def state_index(self, state):
+        return state[0] * self.width + state[1]
 
     def valid_actions(self, state):
         return self.possible_actions
@@ -82,7 +85,9 @@ class GridWorldEnv():
             return (i, j), self.hit_wall_reward
         else:
             return (y, x), self.grids[y][x]
-
+    def get_random_start(self):
+        # get a random start state
+        return randint(0, self.height - 1), randint(0, self.width - 1)
     def __str__(self) -> str:
         to_print = ""
         for i in range(self.height):
