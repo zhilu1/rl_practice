@@ -10,14 +10,14 @@ class DeepQLearningAgent:
                  lr: float = 0.01,
                  ) -> None:
         self.action_space_n = action_space_n
-        self.policy_net = self.initialize_network(state_space_n, 128, action_space_n)
-        self.target_net = self.initialize_network(state_space_n, 128, action_space_n)
+        self.policy_net = self.initialize_network(1, 128, action_space_n)
+        self.target_net = self.initialize_network(1, 128, action_space_n)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.behavior_policy = defaultdict(lambda: np.ones(self.action_space_n) * (1/self.action_space_n))
 
         # self.target_net = torch.
-    def initialize_network(self, in_feature = 2, hidden_dim = 16, out_dim = 1, q_net = None):
+    def initialize_network(self, in_feature = 1, hidden_dim = 16, out_dim = 1, q_net = None):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
         if q_net:
             self.QNetStruct = q_net

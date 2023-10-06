@@ -35,22 +35,23 @@ state = env.get_random_start()
 for _ in range(100):
     action = agent.get_behavior_acion(state)
     next_state, reward = env.step(state, action)
-    replay_buffer.push(env.state_index(state), action, reward, env.state_index(next_state))
+    replay_buffer.push(torch.tensor(env.state_index(state)).unsqueeze(0), torch.tensor(action).unsqueeze(0), torch.tensor(reward).unsqueeze(0), torch.tensor(env.state_index(next_state)).unsqueeze(0))
     state = next_state
 
-
+BATCHSIZE = 5
 """
 perform executing
 """
 for _ in range(100):
     for _ in range(5):
-        transitions  = replay_buffer.sample(5)
+        transitions  = replay_buffer.sample(BATCHSIZE)
         batch = Transition(*zip(*transitions))
-        state = torch.tensor(batch.state)
-        next_state = torch.cat(batch.next_state)
-        reward = torch.cat(batch.reward)
-        action = torch.cat(batch.action)
-
+        state = torch.stack(batch.state)
+        next_state = torch.stack(batch.next_state)
+        reward = torch.stack(batch.reward)
+        action = torch.stack(batch.action)
+        torch.nn.functional.one_hot(action.type(torch.LongTensor), num_classes=env.possible_actions)
+        
         agent.optimizer.zero_grad()
         target_q = max(agent.target_net(next_state))
         target_value = env.discounted_factor * target_q + reward
