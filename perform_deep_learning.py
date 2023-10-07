@@ -22,14 +22,34 @@ def print_actions(agent, env, get_optimal = False):
 
 def state_normalize(env, state):
     return ((state[0] - (env.height-1)/2.0)/env.height,(state[1] - (env.width-1)/2.0)/env.width)
-     
+
+   
 
 from agents.DQN import DeepQLearningAgent
 
 BATCHSIZE = 100
-LEARN_RATE = 1e-6
+LEARN_RATE = 1e-5
+TRUE_RANDOM_STATE_VALUE = [
+    [-3.8, -3.8, -3.6, -3.1, -3.2],
+    [-3.8, -3.8, -3.8, -3.1, -2.9],
+    [-3.6, -3.9, -3.4, -3.2, -2.9],
+    [-3.9, -3.6, -3.4, -2.9, -3.2],
+    [-4.5, -4.2, -3.4, -3.4, -3.5],         
+]
 
-env = GridWorldEnv(3, 4, forbidden_grids=[(2,1), (1,3)], target_grids=[(2,3)], forbidden_reward=-1, hit_wall_reward=-1)
+def calculate_state_value_error(env,agent):
+    # offline policy have 2 policies, I am using the behavior(random) policy for calculating
+    with torch.no_grad():
+        state_value_error = 0
+        for i in range(env.height):
+            for j in range(env.width):
+                state = torch.tensor((i,j), dtype=torch.float).unsqueeze(0)
+                output = agent.policy_net(state)
+                state_value = output.sum()/env.possible_actions
+                state_value_error += (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
+    return state_value_error
+
+env = GridWorldEnv(3, 4, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
 agent = DeepQLearningAgent(state_space_n= 2, action_space_n=env.possible_actions, lr = LEARN_RATE)
 writer = SummaryWriter()
 """
@@ -37,20 +57,23 @@ generate samples to replay buffer
 """
 
 
-replay_buffer = ReplayMemory(10000)
+replay_buffer = ReplayMemory(2000)
 
 state = env.get_random_start()
-for _ in range(10000):
-    action = agent.get_behavior_acion(state)
+for _ in range(2000):
+    action = random.randint(0,4)
+    # action = agent.get_behavior_acion(state)
     next_state, reward = env.step(state, action)
     replay_buffer.push(torch.tensor(state_normalize(env,state), dtype=torch.float), torch.tensor(action, dtype=torch.int64).unsqueeze(0), torch.tensor(reward, dtype=torch.float).unsqueeze(0), torch.tensor(state_normalize(env,next_state), dtype=torch.float))
     state = next_state
+
+
 
 """
 perform executing
 """
 iter_counter = 0
-for _ in range(10000):
+for _ in range(1000):
     for _ in range(50):
         transitions  = replay_buffer.sample(BATCHSIZE)
         batch = Transition(*zip(*transitions))
@@ -67,20 +90,25 @@ for _ in range(10000):
         # minimize distance between policy result and target value, the loss choose can be ..
         agent.optimizer.zero_grad()
         output = agent.policy_net(state)
-        q = output[torch.arange(output.size(0)), action_indices]
+        q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
         # criterion = torch.nn.SmoothL1Loss()
         # loss = criterion(q, target_value)
         # loss.backward()
 
-        loss = agent.loss(q, target_value)
+        loss = agent.loss(q_value, target_value)
         loss.sum().backward()
         # torch.nn.utils.clip_grad_value_(agent.policy_net.parameters(), 100)
         agent.optimizer.step()
-    # copy target network every C=5 iteration   
-    writer.add_scalar('TD error', (q - target_value).sum(), iter_counter)         
+    # copy target network every C=5 iteration
+    # state_value_estimated = output.sum(dim=1) / env.possible_actions 
+    writer.add_scalar('TD error', (q_value - target_value).sum(), iter_counter)         
     writer.add_scalar('Loss', loss.sum(), iter_counter)
+    writer.add_scalar('State value error', calculate_state_value_error(env,agent), iter_counter)
+
+
     iter_counter+=1
-    agent.target_net.load_state_dict(agent.policy_net.state_dict())
+    # agent.target_net.load_state_dict(agent.policy_net.state_dict())
+    agent.sync_target_network()
     # print(loss)
 
 writer.flush()
@@ -89,4 +117,13 @@ print(env)
 
 print_actions(agent, env, True)
 
+print()
 
+# for i in range(env.height):
+#     print("[", end=" ")
+#     for j in range(env.width):
+#         v_hat = estimate_v((i,j), v_func_paramters)
+#         print(v_hat, end=" ")
+#     print("]")
+
+# print()

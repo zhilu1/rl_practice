@@ -3,6 +3,11 @@
 另一方面是 神经网络的构建
 
 可以使用最基础的 shallow net? 但我还不想用 torch 的话, 我要怎么手写 反向传播的梯度计算? 自己手算求导?
+
+DQN 的不成功, 我们可以从两个方面旁敲侧击
+1. 使用 DQN 到 Gym 的其他env中实验
+2. 尝试 value approximation of Q learning, 但是使用线性方程而非神经网络来拟合 q function
+或者干脆先去写 policy gradient
 """
 from torch import nn
 from torch import optim
@@ -14,13 +19,15 @@ class DeepQLearningAgent:
                  state_space_n,
                  action_space_n,
                  lr: float = 0.01,
+                 TAU = 0.5
                  ) -> None:
         self.action_space_n = action_space_n
         self.policy_net = self.initialize_network(state_space_n, 128, action_space_n)
         self.target_net = self.initialize_network(state_space_n, 128, action_space_n)
         self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
         self.behavior_policy = defaultdict(lambda: np.ones(self.action_space_n) * (1/self.action_space_n))
+        self.TAU = TAU
 
         # self.target_net = torch.
     def initialize_network(self, in_feature, hidden_dim, out_dim, q_net = None):
@@ -43,6 +50,12 @@ class DeepQLearningAgent:
         return np.argmax(self.policy_net(state))
     def loss(self, inp, target):
         return (inp-target) ** 2
+    def sync_target_network(self):
+        target_net_state_dict = self.target_net.state_dict()
+        policy_net_state_dict = self.policy_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]*self.TAU + target_net_state_dict[key]*(1-self.TAU)
+        self.target_net.load_state_dict(target_net_state_dict)
         # return self.QNetStruct
     # def encoding_state_action(self, state, action):
         # state 和 action, 假如都是离散的, 可以直接 one_hot encoding
