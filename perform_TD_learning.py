@@ -5,7 +5,6 @@ from collections import defaultdict
 
 
 
-# from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv as GridWorldEnv
 from rl_envs.grid_world_env import GridWorldEnv
 
 

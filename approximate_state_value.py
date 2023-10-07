@@ -5,7 +5,6 @@ from collections import defaultdict
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-# from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv as GridWorldEnv
 from rl_envs.grid_world_env import GridWorldEnv
 from ReplayMemory import *
 from math import cos, sin, pi
@@ -32,7 +31,7 @@ TRUE_RANDOM_STATE_VALUE = [
 ]
 
 
-env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-10, hit_wall_reward=-10)
+env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
 writer = SummaryWriter()
 
 v_func_parameters = [0 for _ in range(4)]

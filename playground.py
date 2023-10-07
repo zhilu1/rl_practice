@@ -9,7 +9,6 @@ import sys
 # TODO n-step Sarsa, 两个版本的 Q-learning (一个是 on-policy, 一个 offpolicy 是一口气生成整个 trajectory )
 # 两个 Task, 从每个 state 出发找到位置 和 仅找到一个 state 出发的最优位置
                 
-# from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv as GridWorldEnv
 from rl_envs.grid_world_env import GridWorldEnv
 from agents.value_iteration_agent import ValueIterationAgent
 from agents.policy_iteration_agent import TruncatedPolicyIterationAgent

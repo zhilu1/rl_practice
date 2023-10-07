@@ -5,7 +5,6 @@ from collections import defaultdict
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-# from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv as GridWorldEnv
 from rl_envs.grid_world_env import GridWorldEnv
 from ReplayMemory import *
 
@@ -23,7 +22,7 @@ def print_actions(agent, env, get_optimal = False):
 def state_normalize(env, state):
     return ((state[0] - (env.height-1)/2.0)/env.height,(state[1] - (env.width-1)/2.0)/env.width)
 
-   
+
 
 from agents.DQN import DeepQLearningAgent
 
@@ -49,7 +48,7 @@ def calculate_state_value_error(env,agent):
                 state_value_error += (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
     return state_value_error
 
-env = GridWorldEnv(3, 4, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
+env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
 agent = DeepQLearningAgent(state_space_n= 2, action_space_n=env.possible_actions, lr = LEARN_RATE)
 writer = SummaryWriter()
 """
@@ -73,7 +72,7 @@ for _ in range(2000):
 perform executing
 """
 iter_counter = 0
-for _ in range(1000):
+for _ in range(200):
     for _ in range(50):
         transitions  = replay_buffer.sample(BATCHSIZE)
         batch = Transition(*zip(*transitions))
@@ -119,11 +118,14 @@ print_actions(agent, env, True)
 
 print()
 
-# for i in range(env.height):
-#     print("[", end=" ")
-#     for j in range(env.width):
-#         v_hat = estimate_v((i,j), v_func_paramters)
-#         print(v_hat, end=" ")
-#     print("]")
+for i in range(env.height):
+    print("[", end=" ")
+    for j in range(env.width):
+        state = torch.tensor((i,j), dtype=torch.float).unsqueeze(0)
+        output = agent.policy_net(state)
+        state_value = output.sum()/env.possible_actions
+        state_value_error = (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
+        print(state_value_error, end=" ")
+    print("]")
 
 # print()
