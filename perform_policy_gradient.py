@@ -25,11 +25,12 @@ agent = PGAgent(2, env.possible_actions, lr = LEARN_RATE)
 writer = SummaryWriter()
 
 
-num_episodes = 10000
+num_episodes = 2000
 for episode in range(num_episodes):
     state = (0,0)
     episode_recorder = []
     steps = 0
+    env.restart()
     while not env.is_terminated:
         action = agent.get_action(torch.tensor(state, dtype=torch.float))
         next_state, reward, done = env.step(state, action)
@@ -54,14 +55,19 @@ for episode in range(num_episodes):
         有一个 变体可能, 在 sample action 时就计算 prob并存储, 然后在 update 时就只是计算 reward 从而计算 loss, 将一个 episode 的loss 都加到一起来一起 backward, 然后更新一次 policy network
         """
 
-        actions_val = abs(agent.policy_net(torch.tensor(state, dtype=torch.float)))
-        action_probs = actions_val/actions_val.sum()
-        loss = torch.log(action_probs[action]) * discounted_reward
+        action_probs = agent.policy_net(torch.tensor(state, dtype=torch.float))
+        # action_probs = actions_val/actions_val.sum()
+        loss = -torch.log(action_probs[action]) * discounted_reward
         # loss = abs(loss)
         loss.backward()
         agent.optimizer.step()
 
     writer.add_scalar('Loss', loss, episode)
+    if episode % 100 == 0:
+        print_actions(agent, env)
+        print(loss)
+        print()
+
 writer.flush()
 writer.close()
 print(env)

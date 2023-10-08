@@ -31,18 +31,20 @@ class PGAgent:
                     nn.Linear(32, hidden_dim),
                     nn.ReLU(),
                     nn.Linear(hidden_dim,out_dim),
-                    # nn.ReLU()
+                    nn.Softmax(dim=-1)
                 )
         return self.net_struct
 
     def get_behavior_acion(self, state):
         return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
     def get_action(self, state, optimal=False):
-        actions_val = abs(self.policy_net(state))
-        action_probs = (actions_val/actions_val.sum()).detach().numpy()
+        action_probs = self.policy_net(state)
+        # action_probs = (actions_val/actions_val.sum()).detach().numpy()
         if optimal:
-            return np.argmax(actions_val)
-        return np.random.choice(len(action_probs),1,p=action_probs)[0]
+            return torch.argmax(action_probs).item()
+        index = action_probs.multinomial(num_samples=1, replacement=True)
+        return index.item()
+        # return np.random.choice(len(action_probs),1,p=action_probs)[0]
 
     def loss(self, inp, target):
         pass
