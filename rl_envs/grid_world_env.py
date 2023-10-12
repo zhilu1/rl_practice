@@ -1,6 +1,6 @@
 from collections import defaultdict
 from random import randint
-
+import numpy as np
 
 class GridWorldEnv():
     def __init__(self,
@@ -16,20 +16,47 @@ class GridWorldEnv():
                 ) -> None:
         self.height = height
         self.width = width
-        self.grids = [[normal_reward for _ in range(width)] for _ in range(height)]
+        self.discounted_factor = discounted_factor # To remove
+        self.nS = width * height
+        # 初始化 grids
+        self.grids = np.zeros((height, width), dtype=float)
+        # [[normal_reward for _ in range(width)] for _ in range(height)]
         for f_grid in forbidden_grids:
             self.grids[f_grid[0]][f_grid[1]] = forbidden_reward
         for t_grid in target_grids:
             self.grids[t_grid[0]][t_grid[1]] = target_reward
-        self._action_space = [(1, 0),(-1,0),(0, 1),(0, -1),(0,0)]
+        self.target_grids = target_grids
         self.hit_wall_reward = hit_wall_reward
+        #  初始化 action 相关
+        self._action_space = [(-1,0),(0, 1),(1, 0),(0, -1),(0,0)]
+        self.action_mappings = [" ↑ "," → "," ↓ ", " ← "," ↺ "]
+        self._state_ind_change = [-width,1,width,-1,0] # state index change based on action
         self.possible_actions = len(self._action_space)
+        self.nA = self.possible_actions
+        #  model-based 的初始化
         self.transition_probs = defaultdict(lambda: defaultdict(float))
         self.expected_rewards = defaultdict(lambda: defaultdict(float))
-        self.target_grids = target_grids
-        self.discounted_factor = discounted_factor
+        self.P = defaultdict(lambda: defaultdict(list)) # P[s][a] = (prob, next_state, reward, is_done)
         
-    def init_model_based_transitions(self, certain_transitions={}):
+    def init_model_based_transitions(self):
+        it = np.nditer(self.grids, flags=['multi_index'])
+        while not it.finished:
+            s = it.iterindex
+            i, j = it.multi_index
+            
+            for action, move in enumerate(self._action_space):
+                y, x = i+move[0], j+move[1]
+                next_s = s+self._state_ind_change[action]
+                if x >= self.width or x < 0 or y >= self.height or y < 0:
+                    # hitwall
+                    self.P[s][action] = [(1, s, self.hit_wall_reward, False)]
+                else:
+                    if (y,x) in self.target_grids:
+                        self.P[s][action] = [(1, next_s, self.grids[y][x], True)]
+                    else:
+                        self.P[s][action] = [(1, next_s, self.grids[y][x], False)]
+            it.iternext()
+
         for i in range(self.height):
             for j in range(self.width):
                 for action, move in enumerate(self._action_space):
@@ -39,10 +66,6 @@ class GridWorldEnv():
                         self.transition_probs[((i,j), action)][(i,j)] = 1
                     else:
                         self.transition_probs[((i,j), action)][(y,x)] = 1
-        
-        for state_action in certain_transitions.keys():
-            for next_state, prob  in certain_transitions[state_action].items():
-                self.transition_probs[state_action][next_state] = prob
 
         for i in range(self.height):
             for j in range(self.width):
@@ -56,27 +79,13 @@ class GridWorldEnv():
                     else:
                         self.expected_rewards[state][action] = self.grids[y][x]
             
-    def state_index(self, state):
+    def state_to_index(self, state):
         return state[0] * self.width + state[1]
-
+    def index_to_state(self, index):
+        return (index // self.width, index % self.width)
     def valid_actions(self, state):
         return self.possible_actions
-    # def step_all(self):
-    #     # a0 up, a1 left, a2 down, a3 right, a4 stay
-    #     total_reward = 0
-    #     immediate_reward = defaultdict(0)
-    #     for i in range(self.height):
-    #         for j in range(self.width):
-    #             a = self.action_grids[i][j]
-    #             x, y = j + self._action_space[a][0], i + self._action_space[a][1]
-    #             if x >= self.width or x < 0 or y >= self.height or y < 0:
-    #                 # hitwall
-    #                 total_reward += self.hit_wall_reward
-    #                 immediate_reward[(i,j)] = self.hit_wall_reward
-    #             else:
-    #                 total_reward += self.grids[y][x]
-    #                 immediate_reward[(i,j)] = self.grids[y][x]
-    #     return total_reward, immediate_reward
+
     def step(self, state, a):
         i, j = state
         y, x = i + self._action_space[a][0], j + self._action_space[a][1]
@@ -85,7 +94,7 @@ class GridWorldEnv():
             return (i, j), self.hit_wall_reward
         else:
             return (y, x), self.grids[y][x]
-    def get_random_start(self):
+    def reset(self):
         # get a random start state
         return randint(0, self.height - 1), randint(0, self.width - 1)
     def __str__(self) -> str:
@@ -98,6 +107,3 @@ class GridWorldEnv():
                 # print(self.grids[i][j], end=" ")
             to_print += "]\n"
         return to_print
-
-    # def get_obs(self, i, j):
-    #     return self.grids

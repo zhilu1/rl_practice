@@ -13,17 +13,16 @@ from rl_envs.grid_world_env import GridWorldEnv
 from agents.value_iteration_agent import ValueIterationAgent
 from agents.policy_iteration_agent import TruncatedPolicyIterationAgent
 
-env = GridWorldEnv(3, 4, forbidden_grids=[(2,1), (1,3)], target_grids=[(2,3)], forbidden_reward=-10)
-# env = GridWorldEnv(3, 4, forbidden_grids=[(2,1), (1,3)], target_grids=[(2,3)])
+# env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
+env = GridWorldEnv(2, 2, forbidden_grids=[(0,1)], target_grids=[(1,1)])
 
 
 def print_actions(agent, env):
-    action_mapping = [" ↓ "," ↑ "," → "," ← "," ↺ "]
     for i in range(env.height):
         print("[", end=" ")
         for j in range(env.width):
             action = agent.get_action((i,j))
-            print(action_mapping[action], end=" ")
+            print(env.action_mappings[action], end=" ")
         print("]")
 
 
@@ -47,6 +46,8 @@ value iteration play
 #     agent.old_v = agent.v.copy()
 
 # print_actions(agent, env)
+# print()
+# print(agent.v)
 # print()
 
 """

@@ -44,7 +44,7 @@ for episode in range(num_episodes):
     for state, action, reward, next_state in reversed(episode_recorder):
         # value update
         discounted_reward = discounted_reward * env.discounted_factor + reward
-        agent.q[state][action] = discounted_reward 
+        # agent.q[state][action] = discounted_reward 
 
         # policy update
         agent.optimizer.zero_grad()

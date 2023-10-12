@@ -13,6 +13,7 @@ from torch import nn
 from torch import optim
 from collections import defaultdict
 import numpy as np
+import torch
 
 class DeepQLearningAgent:
     def __init__(self,
@@ -50,6 +51,27 @@ class DeepQLearningAgent:
         return np.argmax(self.policy_net(state))
     def loss(self, inp, target):
         return (inp-target) ** 2
+    def update_Q_network(self, state, action_indices, reward, next_state, discounted_factor):
+        # 更新 self 的 main network
+        target_q = torch.max(self.target_net(next_state), dim=1).values # TODO values 这啥
+        target_value = discounted_factor * target_q + reward
+        # STABLE-BASELINES3 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+
+        # minimize distance between policy result and target value, the loss choose can be ..
+        self.optimizer.zero_grad()
+        output = self.policy_net(state)
+        q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
+        # criterion = torch.nn.SmoothL1Loss()
+        # loss = criterion(q, target_value)
+        # loss.backward()
+
+        loss = self.loss(q_value, target_value)
+        loss.sum().backward()
+        # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
+        # torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+        self.optimizer.step()
+        return loss, q_value, target_value
+
     def sync_target_network(self):
         target_net_state_dict = self.target_net.state_dict()
         policy_net_state_dict = self.policy_net.state_dict()

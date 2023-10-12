@@ -69,7 +69,7 @@ for _ in range(2000):
 
 
 """
-perform executing
+perform DQN
 """
 iter_counter = 0
 for _ in range(200):
@@ -80,24 +80,8 @@ for _ in range(200):
         next_state = torch.stack(batch.next_state)
         reward = torch.cat(batch.reward)
         action_indices = torch.cat(batch.action)
-        # action_indices = action
-        # action = torch.nn.functional.one_hot(action, num_classes=env.possible_actions)
-        
-        target_q = torch.max(agent.target_net(next_state), dim=1).values
-        target_value = env.discounted_factor * target_q + reward
 
-        # minimize distance between policy result and target value, the loss choose can be ..
-        agent.optimizer.zero_grad()
-        output = agent.policy_net(state)
-        q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
-        # criterion = torch.nn.SmoothL1Loss()
-        # loss = criterion(q, target_value)
-        # loss.backward()
-
-        loss = agent.loss(q_value, target_value)
-        loss.sum().backward()
-        # torch.nn.utils.clip_grad_value_(agent.policy_net.parameters(), 100)
-        agent.optimizer.step()
+        loss, q_value, target_value = agent.update_Q_network(state, action_indices, reward, next_state, env.discounted_factor)
     # copy target network every C=5 iteration
     # state_value_estimated = output.sum(dim=1) / env.possible_actions 
     writer.add_scalar('TD error', (q_value - target_value).sum(), iter_counter)         

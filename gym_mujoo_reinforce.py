@@ -193,6 +193,8 @@ for seed in [1, 2]:  # Fibonacci seeds
 
     rewards_over_seeds.append(reward_over_episodes)
 
+wrapped_env.close()
+
 rewards_to_plot = [[reward[0] for reward in rewards] for rewards in rewards_over_seeds]
 df1 = pd.DataFrame(rewards_to_plot).melt()
 df1.rename(columns={"variable": "episodes", "value": "reward"}, inplace=True)

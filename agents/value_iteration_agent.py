@@ -1,5 +1,6 @@
 import numpy as np
 from collections import defaultdict
+from rl_envs.grid_world_env import GridWorldEnv
 
 class ValueIterationAgent():
     def __init__(self,
@@ -22,38 +23,43 @@ class ValueIterationAgent():
         return action_index
 
     def value_update(self, state):
-        update_amount = 0
-        # for s in self.q.keys():
         self.v[state] = max(self.q[state])
-        update_amount += (self.v[state] - self.old_v[state])
-        return update_amount
+        return abs(self.v[state] - self.old_v[state])
+        # diff = abs(max(self.q[state]) - self.v[state]) 
+        # self.v[state] = max(self.q[state])
+        # return diff
+    
     def not_converged(self, total_update):
         if total_update < self.threshold:
             return False
         else:
             return True
-        # pass
-    def q_table_update(self, s, a, expected_immediate_reward, next_state):
+        
+    def q_table_update(self, s, a, expected_immediate_reward, next_state, prob):
         expected_future_reward = self.old_v[next_state]
-        self.q[s][a] = expected_immediate_reward + self.discounted_factor * expected_future_reward
+        # expected_future_reward = self.v[next_state]
+        self.q[s][a] += prob * (expected_immediate_reward + self.discounted_factor * expected_future_reward)
         return
-    def policy_update(self, state):
-        # for state in self.q.keys():
-            # policy_prob[a] is probabiliy of action a
-        a = np.argmax(self.q[state])
-        for i in range(len(self.policy[state])):
-            self.policy[state][i] = 0
-        self.policy[state][a] = 1
+    
+    def policy_update(self, all_states):
+        for state in range(all_states):
+            a = np.argmax(self.q[state])
+            for i in range(len(self.policy[state])):
+                self.policy[state][i] = 0
+            self.policy[state][a] = 1
         return
-            
 
-        # for s in range(self.state_space_n):
-        #     for a in range(self.action_space_n):
-        #         expected_future_reward = np.sum([transition_prob[s][a][s1] * self.v[s1] for s1 in transition_prob[s][a].keys()])
-        #         self.q[s][a] = expected_reward[s][a] + self.gamma * expected_future_reward 
-        #         self.policy[s][a] = 0
-        #     optimal_a = self.get_action(self, s)
-        #     self.policy[s][optimal_a] = 1
-        # return
-        # for i, state in enumerate(obs):
-            # self.v[]
+    def run(self, env: GridWorldEnv):
+        amount_update = float('inf')
+        while self.not_converged(amount_update):
+            amount_update = 0
+            for s in range(env.nS):
+                for action in range(env.valid_actions(s)):
+                    self.q[s][action] = 0
+                    for prob, next_state, imm_reward, done in env.P[s][action]:
+                        # next_state, imm_reward = env.step(state, action)
+                        self.q_table_update(s, action, imm_reward, next_state, prob)
+                amount_update = max(amount_update,self.value_update(s))
+            self.old_v = self.v.copy()
+        self.policy_update(env.nS) # this step is not necessary, policy is not actually used in VI
+        

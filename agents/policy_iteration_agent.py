@@ -13,6 +13,7 @@ class TruncatedPolicyIterationAgent:
         self.old_v = defaultdict(int)
         self.threshold = threshold
         self.q = defaultdict(lambda: np.zeros(action_space_n))
+        self.policy = defaultdict(lambda: {0: 1})
         # self.policy = defaultdict(lambda: defaultdict(float))
         self.discounted_factor = discounted_factor
         self.truncate_time = truncate_time
@@ -64,9 +65,31 @@ class TruncatedPolicyIterationAgent:
         expected_future_reward = self.v[next_state]
         self.q[s][a] = expected_immediate_reward + self.discounted_factor * expected_future_reward
         return
+    
     def policy_update(self, s):
         a = np.argmax(self.q[s])
         for i in range(len(self.policy[s])):
             self.policy[s][i] = 0
         self.policy[s][a] = 1
         return
+
+    def RUN(self, env):
+        self.initialize_policy()
+        amount_update = float('inf')
+        while self.not_converged(amount_update):
+            amount_update = 0
+
+            # policy evaluation
+            for _ in range(self.truncate_time):
+                for i in range(env.height):
+                    for j in range(env.width):
+                        state = (i,j)
+                        amount = self.policy_evaluation(state, env.expected_rewards, env.transition_probs)
+                        amount_update = max(amount_update, amount)
+                self.old_v = self.v.copy()
+            # policy improvement
+            for i in range(env.height):
+                for j in range(env.width):
+                    state = (i,j)
+                    self.policy_improvement(state, env.expected_rewards, env.transition_probs)
+            
