@@ -7,22 +7,46 @@ import numpy as np
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=5):
+    def __init__(self, render_mode=None, size=5, 
+                fixed_map = True,
+                forbidden_grids=[], 
+                target_grids=[], 
+                target_reward = 1.0,
+                forbidden_reward = -1.0, 
+                hit_wall_reward = -1.0,):
         self.size = size  # The size of the square grid
+        self.height = size
+        self.width = size
         self.window_size = 512  # The size of the PyGame window
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
         self.observation_space = spaces.Dict(
             {
-                "agent": spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                "target": spaces.Box(0, size - 1, shape=(2,), dtype=int),
+                "agent": spaces.Box(0, size - 1, shape=(2,), dtype=float),
+                "target": spaces.Box(0, size - 1, shape=(len(target_grids),2,), dtype=float),
+                "forbidden": spaces.Box(0, size - 1, shape=(len(forbidden_grids),2,), dtype=float),
             }
         )
 
-        # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
-        self.action_space = spaces.Discrete(4)
+        # We have 4 actions, corresponding to "right", "up", "left", "down", "stay"
+        self.action_space = spaces.Discrete(5)
+        self.action_n = self.action_space.n
 
+        
+        """
+        generate the map randomly or use a fixed map
+        """
+        self.fixed_map = fixed_map
+        self.target_grids = target_grids
+        self.forbidden_grids = forbidden_grids
+        self.target_reward = target_reward
+        self.forbidden_reward = forbidden_reward
+        self.hit_wall_reward = hit_wall_reward
+        self.max_steps = 100 # maximum step in a run until truncate
+        self.num_step = 0 # step counter
+
+            
         """
         The following dictionary maps abstract actions from `self.action_space` to 
         the direction we will walk in if that action is taken.
@@ -33,7 +57,9 @@ class GridWorldEnv(gym.Env):
             1: np.array([0, 1]),
             2: np.array([-1, 0]),
             3: np.array([0, -1]),
+            4: np.array([0, 0]),
         }
+        self.action_mappings = [" ↑ "," → "," ↓ ", " ← "," ↺ "]
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -49,7 +75,7 @@ class GridWorldEnv(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location}
+        return {"agent": self._agent_location, "target": self._target_location, "forbidden": self._forbidden_location}
 
     def _get_info(self):
         return {
@@ -61,19 +87,31 @@ class GridWorldEnv(gym.Env):
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
-
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
 
-        # We will sample the target's location randomly until it does not coincide with the agent's location
-        self._target_location = self._agent_location
-        while np.array_equal(self._target_location, self._agent_location):
-            self._target_location = self.np_random.integers(
-                0, self.size, size=2, dtype=int
-            )
+        if self.fixed_map:
+            self._target_location = np.array(self.target_grids)
+            self._forbidden_location = np.array(self.forbidden_grids)
+        else:
+            # We will sample the target's location randomly until it does not coincide with the agent's location
+            self._target_location = self._agent_location
+            while np.array_equal(self._target_location, self._agent_location):
+                self._target_location = self.np_random.integers(
+                    0, self.size, size=2, dtype=int
+                )
+
+            self._forbidden_location = self._agent_location
+            while np.array_equal(self._forbidden_location, self._agent_location) or np.array_equal(self._forbidden_location, self._target_location):
+                self._forbidden_location = self.np_random.integers(
+                    0, self.size, size=2, dtype=int
+                )
+
 
         observation = self._get_obs()
         info = self._get_info()
+
+        self.num_step = 0
 
         if self.render_mode == "human":
             self._render_frame()
@@ -81,23 +119,36 @@ class GridWorldEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        action = action.item()
         # Map the action (element of {0,1,2,3}) to the direction we walk in
-        direction = self._action_to_direction[action]
         # We use `np.clip` to make sure we don't leave the grid
-        self._agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
-        )
+        # self._agent_location = np.clip(
+        #     self._agent_location + direction, 0, self.size - 1
+        # )
         # An episode is done iff the agent has reached the target
-        terminated = np.array_equal(self._agent_location, self._target_location)
-        reward = 1 if terminated else 0  # Binary sparse rewards
+        if not isinstance(action, int):
+            action = action.item()
+        direction = self._action_to_direction[action]
+        new_loc =  self._agent_location + direction
+        terminated = any(np.equal(self._target_location, new_loc).all(1))
+        if (new_loc >= self.size).any() or (new_loc < 0).any():
+            reward = self.hit_wall_reward
+        else:
+            self._agent_location = new_loc
+            reward = self.target_reward if terminated else 0  # Binary sparse rewards
+            reward = self.forbidden_reward if any(np.equal(self._forbidden_location,self._agent_location).all(1)) else reward
+            
         observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, False, info
+        self.num_step+=1
+        truncated = False
+        if self.num_step > self.max_steps:
+            truncated = True
+
+        return observation, reward, terminated , truncated, info
 
     def render(self):
         if self.render_mode == "rgb_array":
@@ -117,20 +168,31 @@ class GridWorldEnv(gym.Env):
             self.window_size / self.size
         )  # The size of a single grid square in pixels
 
-        # First we draw the target
-        pygame.draw.rect(
-            canvas,
-            (255, 0, 0),
-            pygame.Rect(
-                pix_square_size * self._target_location,
-                (pix_square_size, pix_square_size),
-            ),
-        )
+        # First we draw the target grids
+        for loc in self._target_location:
+            pygame.draw.rect(
+                canvas,
+                (0, 255, 0),
+                pygame.Rect(
+                    pix_square_size * loc[::-1],
+                    (pix_square_size, pix_square_size),
+                ),
+            )
+        # Then we draw the forbidden grids
+        for loc in self._forbidden_location:
+            pygame.draw.rect(
+                canvas,
+                (255, 0, 0),
+                pygame.Rect(
+                    pix_square_size * loc[::-1],
+                    (pix_square_size, pix_square_size),
+                ),
+            )
         # Now we draw the agent
         pygame.draw.circle(
             canvas,
             (0, 0, 255),
-            (self._agent_location + 0.5) * pix_square_size,
+            (self._agent_location[::-1] + 0.5) * pix_square_size,
             pix_square_size / 3,
         )
 

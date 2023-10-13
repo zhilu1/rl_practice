@@ -48,7 +48,7 @@ def calculate_state_value_error(env,agent):
                 state_value_error += (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
     return state_value_error
 
-env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
+env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1, target_reward=10)
 agent = DeepQLearningAgent(state_space_n= 2, action_space_n=env.possible_actions, lr = LEARN_RATE)
 writer = SummaryWriter()
 """
@@ -58,7 +58,7 @@ generate samples to replay buffer
 
 replay_buffer = ReplayMemory(2000)
 
-state = env.get_random_start()
+state = env.reset()
 for _ in range(2000):
     action = random.randint(0,4)
     # action = agent.get_behavior_acion(state)
