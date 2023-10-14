@@ -18,61 +18,77 @@ from itertools import zip_longest
 
 class DeepQLearningAgent:
     def __init__(self,
-                 state_space_n,
-                 action_space_n,
+                 input_dim,
+                 output_dim,
+                 action_space,
                  lr: float = 0.01,
                  TAU =  0.005,
                  discounted_factor = 0.99,
                  hidden_dim = 100
                  ) -> None:
-        self.action_space_n = action_space_n
-        self.policy_net = self.initialize_network(state_space_n, hidden_dim, action_space_n)
-        self.target_net = self.initialize_network(state_space_n, hidden_dim, action_space_n)
+        self.output_dim = output_dim
+        self.action_space = action_space
+        self.policy_net = self.initialize_network(input_dim, hidden_dim, output_dim)
+        self.target_net = self.initialize_network(input_dim, hidden_dim, output_dim)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
-        self.behavior_policy = defaultdict(lambda: np.ones(self.action_space_n) * (1/self.action_space_n))
+        self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
         self.TAU = TAU
         self.discounted_factor = discounted_factor
 
         # self.target_net = torch.
     def initialize_network(self, in_feature, hidden_dim, out_dim, q_net = None):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
-        if q_net:
-            self.QNetStruct = q_net
-        else:
-            self.QNetStruct = nn.Sequential(
-                        nn.Linear(in_feature, hidden_dim),
-                        nn.ReLU(),
-                        nn.Linear(hidden_dim, hidden_dim),
-                        nn.ReLU(),
-                        nn.Linear(hidden_dim,out_dim)
-                    )
-        return self.QNetStruct
 
+        self.QNetStruct = nn.Sequential(
+                    nn.Linear(in_feature, hidden_dim),
+                    nn.ReLU(),
+                    nn.Linear(hidden_dim,out_dim)
+                )
+        return self.QNetStruct
+    def state_normalize(self, state, height, width):
+        # normalize each to [0,1]
+        return (state[0]/(height-1),state[1]/(width-1))
+    
     def get_behavior_acion(self, state):
         return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
-    def get_action(self, state):
-        return np.argmax(self.policy_net(state))
+
+    def get_action(self, state, optimal=True):
+        best_action = 0
+        max_q = - float('inf')
+        state = torch.tensor(state, dtype=torch.float).unsqueeze(0)
+        for action_ind in range(self.action_space):
+            action = torch.tensor(action_ind/(self.action_space-1), dtype=torch.float).view(-1,1)
+            sa_pair = torch.cat([state,action], dim=1)
+            q_value = self.policy_net(sa_pair)
+            if q_value >= max_q:
+                best_action = action_ind
+                max_q = q_value
+        return best_action
+    
     def loss(self, inp, target):
         return (inp-target) ** 2
     def update_Q_network(self, state, action_indices, reward, next_state):
         # 更新 self 的 main network
-        target_q = torch.max(self.target_net(next_state), dim=1).values # torch.max 在 dim 指定时似乎才会有 values 和 indices 来表示
+        action_tiles = torch.arange(5).reshape(5, 1).repeat(100,1)
+        next_sa = torch.cat([next_state.repeat(5,1),action_tiles], dim=1)
+        target_output = self.target_net(next_sa)
+        target_q = torch.max(target_output.reshape(-1,5), dim=1).values
+        # target_q = max(target_q, self.target_net(next_sa).item()) # torch.max 在 dim 指定时似乎才会有 values 和 indices 来表示
         target_value = self.discounted_factor * target_q + reward
         # STABLE-BASELINES3 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
         # minimize distance between policy result and target value, the loss choose can be ..
         self.optimizer.zero_grad()
-        output = self.policy_net(state)
-        q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
-        criterion = torch.nn.SmoothL1Loss()
-        loss = criterion(q_value, target_value)
-        loss.backward()
-            # Compute Huber loss (less sensitive to outliers)
-
-            # Clip gradient norm
-        # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
-        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 10)
+        sa_pair = torch.cat([state, action_indices.unsqueeze(1)], dim=1)
+        q_value = self.policy_net(sa_pair)
+        # q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
+        # criterion = torch.nn.SmoothL1Loss()
+        # loss = criterion(q_value, target_value)
+        # loss.backward()
+        loss = self.loss(q_value.squeeze(), target_value)
+        loss.sum().backward()
+        # torch.nn.utils.clip_grad.clip_grad_norm_(self.policy_net.parameters(), 10)
         self.optimizer.step()
         return loss, q_value, target_value
 

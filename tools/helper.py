@@ -87,7 +87,10 @@ def print_by_dict(env, dic):
     for i in range(env.height):
         print("[", end=" ")
         for j in range(env.width):
-            print("%.2f" %dic[(i,j)], end=" ")
+            if isinstance(dic[(i,j)], float):
+                print("%.2f" %dic[(i,j)], end=" ")
+            else:
+                print(dic[(i,j)], end=" ")
         print("]")
 
 def visualize_in_gym(agent, env_name =  "", inp_env = None, steps=1000):
