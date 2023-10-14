@@ -31,19 +31,29 @@ class DeepQLearningAgent:
         self.policy_net = self.initialize_network(input_dim, hidden_dim, output_dim)
         self.target_net = self.initialize_network(input_dim, hidden_dim, output_dim)
         self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        # self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
         self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
         self.TAU = TAU
         self.discounted_factor = discounted_factor
 
         # self.target_net = torch.
-    def initialize_network(self, in_feature, hidden_dim, out_dim, q_net = None):
+    def initialize_network(self, in_dim, hidden_dim, out_dim, q_net = None):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
 
         self.QNetStruct = nn.Sequential(
-                    nn.Linear(in_feature, hidden_dim),
+                    nn.Linear(in_features=in_dim, out_features=128),
                     nn.ReLU(),
-                    nn.Linear(hidden_dim,out_dim)
+                    nn.Linear(in_features=128, out_features=64),
+                    nn.ReLU(),
+                    nn.Linear(in_features=64, out_features=32),
+                    nn.ReLU(),
+                    nn.Linear(in_features=32, out_features=out_dim),
+                    # nn.Linear(in_feature, hidden_dim),
+                    # nn.ReLU(),
+                    # # nn.Linear(hidden_dim, hidden_dim),
+                    # # nn.ReLU(),
+                    # nn.Linear(hidden_dim,out_dim)
                 )
         return self.QNetStruct
     def state_normalize(self, state, height, width):
@@ -67,37 +77,47 @@ class DeepQLearningAgent:
         return best_action
     
     def loss(self, inp, target):
-        return (inp-target) ** 2
+        return ((inp-target) ** 2) / target.size(0)
     def update_Q_network(self, state, action_indices, reward, next_state):
         # 更新 self 的 main network
+
+        # 计算 TD-target, 因为 batch 的存在, 需要做一些维度上的操作
         action_tiles = torch.arange(5).reshape(5, 1).repeat(100,1)
         next_sa = torch.cat([next_state.repeat(5,1),action_tiles], dim=1)
         target_output = self.target_net(next_sa)
+        # 注意这里 max 是 Qlearn 和 Sarsa 的关键区别
         target_q = torch.max(target_output.reshape(-1,5), dim=1).values
-        # target_q = max(target_q, self.target_net(next_sa).item()) # torch.max 在 dim 指定时似乎才会有 values 和 indices 来表示
         target_value = self.discounted_factor * target_q + reward
+
         # STABLE-BASELINES3 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
-        # minimize distance between policy result and target value, the loss choose can be ..
+        # 计算 q(s,a,w) 的估计
         self.optimizer.zero_grad()
         sa_pair = torch.cat([state, action_indices.unsqueeze(1)], dim=1)
         q_value = self.policy_net(sa_pair)
         # q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
+
+        # minimize distance between policy result and target value, the loss choose can be ..
         # criterion = torch.nn.SmoothL1Loss()
-        # loss = criterion(q_value, target_value)
+        # # criterion = torch.nn.HuberLoss()
+        # # loss = criterion(q_value, target_value)
+        # loss = criterion(q_value.squeeze(), target_value)
         # loss.backward()
+
+
         loss = self.loss(q_value.squeeze(), target_value)
         loss.sum().backward()
-        # torch.nn.utils.clip_grad.clip_grad_norm_(self.policy_net.parameters(), 10)
+        torch.nn.utils.clip_grad.clip_grad_norm_(self.policy_net.parameters(), 100)
         self.optimizer.step()
         return loss, q_value, target_value
 
     def sync_target_network(self):
         with torch.no_grad():
-            # zip does not raise an exception if length of parameters does not match.
-            for param, target_param in self.zip_strict(self.policy_net.parameters(), self.target_net.parameters()):
-                target_param.data.mul_(1 - self.TAU)
-                torch.add(target_param.data, param.data, alpha=self.TAU, out=target_param.data)
+            self.target_net.load_state_dict(self.policy_net.state_dict())
+        #     # zip does not raise an exception if length of parameters does not match.
+        #     for param, target_param in self.zip_strict(self.policy_net.parameters(), self.target_net.parameters()):
+        #         target_param.data.mul_(1 - self.TAU)
+        #         torch.add(target_param.data, param.data, alpha=self.TAU, out=target_param.data)
 
     def zip_strict(self,*iterables):
         r"""
