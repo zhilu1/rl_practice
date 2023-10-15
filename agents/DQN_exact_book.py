@@ -16,16 +16,18 @@ import numpy as np
 import torch
 from itertools import zip_longest
 
+
 class DeepQLearningAgent:
-    def __init__(self,
-                 input_dim,
-                 output_dim,
-                 action_space,
-                 lr: float = 0.01,
-                 TAU =  0.005,
-                 discounted_factor = 0.99,
-                 hidden_dim = 100
-                 ) -> None:
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        action_space,
+        lr: float = 0.01,
+        TAU=0.005,
+        discounted_factor=0.99,
+        hidden_dim=100,
+    ) -> None:
         self.output_dim = output_dim
         self.action_space = action_space
         self.policy_net = self.initialize_network(input_dim, hidden_dim, output_dim)
@@ -33,80 +35,120 @@ class DeepQLearningAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         # self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True)
-        self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
+        self.behavior_policy = defaultdict(
+            lambda: np.ones(self.action_space) * (1 / self.action_space)
+        )
         self.TAU = TAU
         self.discounted_factor = discounted_factor
+        self.criterion = torch.nn.SmoothL1Loss()
 
         # self.target_net = torch.
-    def initialize_network(self, in_dim, hidden_dim, out_dim, q_net = None):
+
+    def initialize_network(self, in_dim, hidden_dim, out_dim, q_net=None):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
 
         self.QNetStruct = nn.Sequential(
-                    nn.Linear(in_features=in_dim, out_features=128),
-                    nn.ReLU(),
-                    nn.Linear(in_features=128, out_features=64),
-                    nn.ReLU(),
-                    nn.Linear(in_features=64, out_features=32),
-                    nn.ReLU(),
-                    nn.Linear(in_features=32, out_features=out_dim),
-                    # nn.Linear(in_feature, hidden_dim),
-                    # nn.ReLU(),
-                    # # nn.Linear(hidden_dim, hidden_dim),
-                    # # nn.ReLU(),
-                    # nn.Linear(hidden_dim,out_dim)
-                )
+            nn.Linear(in_features=in_dim, out_features=128),
+            nn.ReLU(),
+            nn.Linear(in_features=128, out_features=64),
+            nn.ReLU(),
+            nn.Linear(in_features=64, out_features=32),
+            nn.ReLU(),
+            nn.Linear(in_features=32, out_features=out_dim),
+            # nn.Linear(in_feature, hidden_dim),
+            # nn.ReLU(),
+            # # nn.Linear(hidden_dim, hidden_dim),
+            # # nn.ReLU(),
+            # nn.Linear(hidden_dim,out_dim)
+        )
         return self.QNetStruct
+
     def state_normalize(self, state, height, width):
         # normalize each to [0,1]
-        return (state[0]/(height-1),state[1]/(width-1))
-    
+        return (state[0] / (height - 1), state[1] / (width - 1))
+
     def get_behavior_acion(self, state):
-        return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
+        return np.random.choice(
+            len(self.behavior_policy[state]), 1, p=self.behavior_policy[state]
+        )[
+            0
+        ]  # random choose an action based on policy
 
     def get_action(self, state, optimal=True):
         best_action = 0
-        max_q = - float('inf')
+        max_q = -float("inf")
         state = torch.tensor(state, dtype=torch.float).unsqueeze(0)
         for action_ind in range(self.action_space):
-            action = torch.tensor(action_ind/(self.action_space-1), dtype=torch.float).view(-1,1)
-            sa_pair = torch.cat([state,action], dim=1)
+            action = torch.tensor(action_ind, dtype=torch.float).view(-1, 1)
+            # action = torch.tensor(
+            #     action_ind / (self.action_space - 1), dtype=torch.float
+            # ).view(-1, 1)
+            sa_pair = torch.cat([state, action], dim=1)
             q_value = self.policy_net(sa_pair)
             if q_value >= max_q:
                 best_action = action_ind
                 max_q = q_value
         return best_action
-    
-    def loss(self, inp, target):
-        return ((inp-target) ** 2) / target.size(0)
-    def update_Q_network(self, state, action_indices, reward, next_state):
-        # 更新 self 的 main network
 
+    def loss(self, inp, target):
+        return ((inp - target) ** 2) / target.size(0)
+
+    def update_Q_network(self, state_action, reward, next_state):
+        # 更新 self 的 main network
+        batch_size = 100
+
+        # q_value_target = torch.empty((batch_size, 0))  # 定义空的张量
+        # for action in range(self.action_space):
+        #     s_a = torch.cat((next_state, torch.full((batch_size, 1), action)), dim=1)
+        #     q_value_target = torch.cat((q_value_target, self.target_net(s_a)), dim=1)
+        # q_star = torch.max(q_value_target, dim=1, keepdim=True)[0]
+        # target_value = (reward + self.discounted_factor * q_star).squeeze()
+        """
         # 计算 TD-target, 因为 batch 的存在, 需要做一些维度上的操作
-        action_tiles = torch.arange(5).reshape(5, 1).repeat(100,1)
-        next_sa = torch.cat([next_state.repeat(5,1),action_tiles], dim=1)
+        # WARNING: 错误看起来就是在这里这部分, 稍等之前我似乎是忘记把这里的action normalize 了?
+        问题找到了: 此前 next_state.repeat(5, 1) 是整个一块地复制, 导致 reshape 时的 连续 5 行 state 是不同的
+        [[1,2],
+         [3,4]] 
+        被复制成
+        [[1,2],
+        [3,4],
+        [1,2],
+        [3,4]] 
+        而我实际想要的是 
+        [[1,2],
+        [1,2],
+        [3,4],
+        [3,4]]
+        """
+        action_tiles = torch.arange(5).reshape(5, 1).repeat(batch_size, 1)
+        # for action in range(self.action_space):
+        next_sa = torch.cat(
+            [torch.repeat_interleave(next_state, repeats=5, dim=0), action_tiles], dim=1
+        )
         target_output = self.target_net(next_sa)
         # 注意这里 max 是 Qlearn 和 Sarsa 的关键区别
-        target_q = torch.max(target_output.reshape(-1,5), dim=1).values
+        target_q = torch.max(
+            target_output.reshape(-1, 5), dim=1, keepdim=True
+        ).values  #
         target_value = self.discounted_factor * target_q + reward
 
         # STABLE-BASELINES3 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
         # 计算 q(s,a,w) 的估计
-        self.optimizer.zero_grad()
-        sa_pair = torch.cat([state, action_indices.unsqueeze(1)], dim=1)
-        q_value = self.policy_net(sa_pair)
+        # sa_pair = torch.cat([state, action_indices.unsqueeze(1)], dim=1)
+        q_value = self.policy_net(state_action)
         # q_value = output[torch.arange(output.size(0)), action_indices] # q value of (state, action)
 
         # minimize distance between policy result and target value, the loss choose can be ..
         # criterion = torch.nn.SmoothL1Loss()
         # # criterion = torch.nn.HuberLoss()
-        # # loss = criterion(q_value, target_value)
-        # loss = criterion(q_value.squeeze(), target_value)
-        # loss.backward()
+        self.optimizer.zero_grad()
+        loss = self.criterion(q_value, target_value)
+        # loss = criterion(q_value, target_value)
+        loss.backward()
 
-
-        loss = self.loss(q_value.squeeze(), target_value)
-        loss.sum().backward()
+        # loss = self.loss(q_value.squeeze(), target_value)
+        # loss.sum().backward()
         torch.nn.utils.clip_grad.clip_grad_norm_(self.policy_net.parameters(), 100)
         self.optimizer.step()
         return loss, q_value, target_value
@@ -119,7 +161,7 @@ class DeepQLearningAgent:
         #         target_param.data.mul_(1 - self.TAU)
         #         torch.add(target_param.data, param.data, alpha=self.TAU, out=target_param.data)
 
-    def zip_strict(self,*iterables):
+    def zip_strict(self, *iterables):
         r"""
         ``zip()`` function but enforces that iterables are of equal length.
         Raises ``ValueError`` if iterables not of equal length.
@@ -142,9 +184,9 @@ class DeepQLearningAgent:
         #     target_net_state_dict[key] = policy_net_state_dict[key]*self.TAU + target_net_state_dict[key]*(1-self.TAU)
         # self.target_net.load_state_dict(target_net_state_dict)
         # return self.QNetStruct
-    # def encoding_state_action(self, state, action):
-        # state 和 action, 假如都是离散的, 可以直接 one_hot encoding
-        # 假如都是连续的, 那么就直接输入给神经网络似乎也可以
-        # 考虑到 grid world 环境 state 是有上下关系的, 那么可以 state 直接作为有顺序的数字 encode, action 则 one_hot encoding
-        # 后注: 上面的想法都不必要, 实际上用 state 输入 而非 (s,a) pair, 然后同时输出多个 action 的 action value
 
+    # def encoding_state_action(self, state, action):
+    # state 和 action, 假如都是离散的, 可以直接 one_hot encoding
+    # 假如都是连续的, 那么就直接输入给神经网络似乎也可以
+    # 考虑到 grid world 环境 state 是有上下关系的, 那么可以 state 直接作为有顺序的数字 encode, action 则 one_hot encoding
+    # 后注: 上面的想法都不必要, 实际上用 state 输入 而非 (s,a) pair, 然后同时输出多个 action 的 action value
