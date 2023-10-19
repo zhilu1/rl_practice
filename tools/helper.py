@@ -164,7 +164,7 @@ def gridworld_demo(agent, forbidden_reward=-1, hit_wall_reward=-1, target_reward
     routine = [obs['agent']]
     for i in range(500):
         obs = tuple(obs['agent'])
-        action = agent.get_action(obs)
+        action = agent.get_action(obs, optimal=True)
         obs, reward, terminated, truncated, info  = env.step(action)
         # VecEnv resets automatically
         total_reward += reward

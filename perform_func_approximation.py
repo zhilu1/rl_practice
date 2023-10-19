@@ -173,7 +173,6 @@ for episode_ind in range(1): # 5 episode
         iter_counter+=1
         
 writer.flush()
-writer.close()
 
 action_mapping = [" ↓ "," ↑ "," → "," ← "," ↺ "]
 for i in range(env.height):

@@ -95,7 +95,6 @@ for _ in range(200):
     # print(loss)
 
 writer.flush()
-writer.close()
 print(env)
 
 print_actions(agent, env, True)

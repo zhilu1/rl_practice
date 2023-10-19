@@ -22,17 +22,17 @@ class PGAgent:
         self.discounted_factor = discounted_factor
     def initialize_network(self, in_feature, hidden_dim, out_dim):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
-        self.net_struct = nn.Sequential(
+        net_struct = nn.Sequential(
                     nn.Linear(in_feature, hidden_dim),
                     nn.ReLU(),
-                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.Linear(hidden_dim, 64),
                     nn.ReLU(),
-                    nn.Linear(hidden_dim,out_dim),
+                    nn.Linear(64,out_dim),
                     nn.Softmax(dim=-1)
                 )
-        return self.net_struct
+        return net_struct
 
-    def get_behavior_acion(self, state):
+    def get_behavior_action(self, state):
         return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
     def get_action(self, state, optimal=False):
         with torch.no_grad():
@@ -41,14 +41,19 @@ class PGAgent:
         # action_probs = (actions_val/actions_val.sum()).detach().numpy()
         if optimal:
             return torch.argmax(action_probs).item()
-        index = action_probs.multinomial(num_samples=1, replacement=True)
-        return index.item()
+        action = np.random.choice(len(action_probs),1,p=action_probs.numpy())
+        return action
+        # index = action_probs.multinomial(num_samples=1, replacement=True)
+        # return index.item()
         # return np.random.choice(len(action_probs),1,p=action_probs)[0]
     def update(self, trajectory):
         discounted_reward = 0
         for state, action, reward in reversed(trajectory):
+            # REINFORCE 或叫 Monte Carlo policy gradient, 其中原因就是 q(s, a) 是由 Monte Carlo learning 方法估计
+            # 也就是这里的 self.q[state][action] = discounted_reward, 但 PG 算法 实际上并不需要记录 q 值因此不写出
             discounted_reward = discounted_reward * self.discounted_factor + reward
-            # agent.q[observation][action] = discounted_reward 
+            # self.q[state][action] = discounted_reward 
+
             # policy update
             self.optimizer.zero_grad()
             """
@@ -60,14 +65,14 @@ class PGAgent:
 
             action_probs = self.policy_net(torch.tensor(state, dtype=torch.float))
             # action_probs = actions_val/actions_val.sum()
-            loss = torch.log(action_probs[action]) * discounted_reward
+            loss = -torch.log(action_probs[action]) * discounted_reward
             # loss = abs(loss)
             loss.backward()
             self.optimizer.step()
             return loss
     def generate_policy_table(self, height, width):
         """
-        only for debug use, PG doesn't own nor need a real Q table
+        only for debug use, PG doesn't own nor need a real policy table
         """
         policy = {}
         for y in range(height):

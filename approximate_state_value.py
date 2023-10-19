@@ -84,7 +84,6 @@ for episode_ind in range(5): # 5 episode
         iter_counter+=1
         
 writer.flush()
-writer.close()
 
 for i in range(env.height):
     print("[", end=" ")
