@@ -1,6 +1,6 @@
 import torch
 import math
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter # noqa
 
 from rl_envs.episodic_grid_world_env import EpisodicGridWorldEnv
 from agents.policy_gradient import PGAgent
@@ -9,19 +9,9 @@ episode_rewards = []
 episode_lengths = []
 
 LEARN_RATE = 0.01
-def print_actions(agent, env, get_optimal = False):
-    with torch.no_grad():
-        action_mapping = [" ↓ "," ↑ "," → "," ← "," ↺ "]
-        for i in range(env.height):
-            print("[", end=" ")
-            for j in range(env.width):
-                state = torch.tensor((i,j), dtype=torch.float)
-                action = agent.get_action(state)
-                print(action_mapping[action], end=" ")
-            print("]")
 
 env = EpisodicGridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1)
-agent = PGAgent(2, env.possible_actions, lr = LEARN_RATE)
+agent = PGAgent(2, env.action_n, lr = LEARN_RATE)
 writer = SummaryWriter()
 
 
@@ -29,16 +19,12 @@ num_episodes = 2000
 for episode in range(num_episodes):
     state = (0,0)
     episode_recorder = []
-    steps = 0
-    env.restart()
+    env.reset()
     while not env.is_terminated:
         action = agent.get_action(torch.tensor(state, dtype=torch.float))
         next_state, reward, done = env.step(state, action)
         episode_recorder.append((state, action, reward, next_state))
         state = next_state
-        if steps > 50:
-            break
-        steps += 1
     
     discounted_reward = 0
     for state, action, reward, next_state in reversed(episode_recorder):

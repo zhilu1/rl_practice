@@ -38,8 +38,7 @@ class EpisodicGridWorldEnv():
         self._action_space = [(-1,0),(0, 1),(1, 0),(0, -1),(0,0)]
         self.action_mappings = [" ↑ "," → "," ↓ ", " ← "," ↺ "]
         self._state_ind_change = [-width,1,width,-1,0] # state index change based on action
-        self.possible_actions = len(self._action_space)
-        self.nA = self.possible_actions
+        self.action_n = len(self._action_space)
         self.is_terminated = False
     def termination(self):
         self.is_terminated = True
@@ -48,7 +47,7 @@ class EpisodicGridWorldEnv():
         return randint(0, self.height - 1), randint(0, self.width - 1)
 
     def valid_actions(self, state):
-        return self.possible_actions
+        return self.action_n
 
     def step(self, state, a) -> tuple[tuple[int,int], float, bool]:
         if self.is_terminated:

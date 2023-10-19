@@ -35,10 +35,10 @@ class ValueIterationAgent():
         else:
             return True
         
-    def q_table_update(self, s, a, expected_immediate_reward, next_state, prob):
+    def q_table_update(self, s, a, expected_immediate_reward, next_state, prob_sr):
         expected_future_reward = self.old_v[next_state]
         # expected_future_reward = self.v[next_state]
-        self.q[s][a] += prob * (expected_immediate_reward + self.discounted_factor * expected_future_reward)
+        self.q[s][a] += prob_sr * (expected_immediate_reward + self.discounted_factor * expected_future_reward)
         return
     
     def policy_update(self, all_states):
@@ -57,7 +57,6 @@ class ValueIterationAgent():
                 for action in range(env.valid_actions(s)):
                     self.q[s][action] = 0
                     for prob, next_state, imm_reward, done in env.P[s][action]:
-                        # next_state, imm_reward = env.step(state, action)
                         self.q_table_update(s, action, imm_reward, next_state, prob)
                 amount_update = max(amount_update,self.value_update(s))
             self.old_v = self.v.copy()

@@ -18,7 +18,7 @@ def print_actions(env, parameters):
                 state = (i,j)
                 max_q_val = - float('inf')
                 best_action = 0
-                for action in range(env.possible_actions):
+                for action in range(env.action_n):
                     q_val = estimate_q(state, action, parameters)
                     if q_val > max_q_val:
                         max_q_val = q_val
@@ -66,9 +66,9 @@ def calculate_state_value_error(env: GridWorldEnv, paramters):
             for j in range(env.width):
                 state = (i,j)
                 output = 0
-                for action in range(env.possible_actions):
+                for action in range(env.action_n):
                     output += estimate_q(state,  action, paramters)
-                state_value = output/env.possible_actions
+                state_value = output/env.action_n
                 state_value_error += (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
     return state_value_error
 """
@@ -96,7 +96,7 @@ for episode_ind in range(1): # 5 episode
         state, action, reward, next_state  = replay_buffer.sample()[0]
 
         next_q = -float('inf')
-        for poss_action in range(env.possible_actions):
+        for poss_action in range(env.action_n):
             next_q = max(next_q, estimate_q(next_state, poss_action, q_func_parameters))
                        
         TD_error = reward + env.discounted_factor * next_q - estimate_q(state, action, q_func_parameters)
@@ -132,7 +132,7 @@ from agents.approx_Q_Learning import QLearningAgent
 
 iter_counter = 0
 
-agent = QLearningAgent(env.possible_actions)
+agent = QLearningAgent(env.action_n)
 
 for episode_ind in range(1): # 5 episode
     state = env.get_random_start()
@@ -141,7 +141,7 @@ for episode_ind in range(1): # 5 episode
         next_state, reward = env.step(state, action)
 
         next_q = -float('inf')
-        for poss_action in range(env.possible_actions):
+        for poss_action in range(env.action_n):
             next_q = max(next_q, estimate_q(next_state, poss_action, q_func_parameters))
                        
         TD_error = reward + env.discounted_factor * next_q - estimate_q(state, action, q_func_parameters)
@@ -150,7 +150,7 @@ for episode_ind in range(1): # 5 episode
 
         max_q_val = - float('inf')
         best_action = 0
-        for poss_action in range(env.possible_actions):
+        for poss_action in range(env.action_n):
             q_val = estimate_q(state, poss_action, q_func_parameters)
             if q_val > max_q_val:
                 max_q_val = q_val

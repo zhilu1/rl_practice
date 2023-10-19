@@ -3,7 +3,7 @@ import numpy as np
 
 class QLearningAgent:
     def __init__(self,
-                action_space_n,
+                action_space_n = 5,
                 initial_q = None,
                 epsilon = 0.1,
                 learning_rate = 0.01,
@@ -43,5 +43,24 @@ class QLearningAgent:
             return np.argmax(self.policy[state])
         return np.random.choice(len(self.policy[state]),1,p=self.policy[state])[0] # random choose an action based on policy
         
-    def get_behavior_acion(self, state):
+    def get_behavior_action(self, state):
         return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
+
+    def RUN(self, env, episode_len = 100000, epochs = 2):
+        # collecting experiences
+        obs, _ = env.reset()
+        trajectory = []
+        for _ in range(episode_len):
+            state = tuple(obs['agent'])
+            action = self.get_behavior_action(state)
+            obs, reward, terminated , truncated, info = env.step(action)
+            next_state = tuple(obs['agent'])
+            trajectory.append((state, action, reward , next_state))
+            state = next_state
+            
+        for _ in range(epochs):
+            for state, action, reward, next_state in trajectory:
+                td_target = reward + 0.9 * max(self.q[next_state])
+                self.td_learn(state, action, td_target)
+                self.policy_improvement(state)
+

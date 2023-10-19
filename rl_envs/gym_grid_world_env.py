@@ -2,7 +2,8 @@ import gymnasium as gym
 from gymnasium import spaces
 import pygame
 import numpy as np
-
+import torch
+from collections import defaultdict
 
 class GridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
@@ -31,7 +32,7 @@ class GridWorldEnv(gym.Env):
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "stay"
         self.action_space = spaces.Discrete(5)
-        self.action_n = self.action_space.n
+        self.action_n = int(self.action_space.n)
 
         
         """
@@ -46,6 +47,11 @@ class GridWorldEnv(gym.Env):
         self.max_steps = 100 # maximum step in a run until truncate
         self.num_step = 0 # step counter
 
+        """
+        model-based 时所使用的参数
+        """
+        self.Prsa = defaultdict(lambda: defaultdict(list)) # Prsa[s][a] = [(prob, reward)]
+        self.Pssa = defaultdict(lambda: defaultdict(list)) # Pssa[s][a] = [(prob, next_state)]
             
         """
         The following dictionary maps abstract actions from `self.action_space` to 
@@ -59,7 +65,7 @@ class GridWorldEnv(gym.Env):
             3: np.array([0, -1]),
             4: np.array([0, 0]),
         }
-        self.action_mappings = [" ↑ "," → "," ↓ ", " ← "," ↺ "]
+        self.action_mappings = [" ↓ "," → "," ↑ ", " ← "," ↺ "]
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -88,7 +94,10 @@ class GridWorldEnv(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
         # Choose the agent's location uniformly at random
-        self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+        if options and options['start_position']:
+            self._agent_location = options['start_position']
+        else:
+            self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
 
         if self.fixed_map:
             self._target_location = np.array(self.target_grids)
@@ -150,6 +159,32 @@ class GridWorldEnv(gym.Env):
 
         return observation, reward, terminated , truncated, info
 
+    def initialize_model_based(self):
+        """
+        initialize this before using model-based algorithm
+
+        Prsa: p(r|s, a)
+        Pssa: p(s'|s, a)
+        """
+        for i in range(self.height):
+            for j in range(self.width):
+                state = (i,j)
+                for action, move in self._action_to_direction.items():
+                    y, x = i+move[0], j+move[1]
+                    if x >= self.width or x < 0 or y >= self.height or y < 0:
+                        # hitwall
+                        self.Prsa[state][action] = [(1, self.hit_wall_reward)]
+                        self.Pssa[state][action] = [(1, (i,j))]
+                    else:
+                        if (y,x) in self.target_grids:
+                            self.Prsa[state][action] = [(1, self.target_reward)]
+                            self.Pssa[state][action] = [(1, (y,x))]
+                        elif (y,x) in self.forbidden_grids:
+                            self.Prsa[state][action] = [(1, self.forbidden_reward)]
+                            self.Pssa[state][action] = [(1, (y,x))]
+                        else:
+                            self.Prsa[state][action] = [(1, 0)]
+                            self.Pssa[state][action] = [(1, (y,x))]
     def render(self):
         if self.render_mode == "rgb_array":
             return self._render_frame()

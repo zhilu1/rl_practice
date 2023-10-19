@@ -54,7 +54,7 @@ generate samples to replay buffer
 
 replay_buffer = ReplayMemory(10000)
 
-state = env.get_random_start()
+state = env.reset()
 for _ in range(10000):
     action = random.randint(0,4)
     next_state, reward = env.step(state, action)
@@ -94,7 +94,7 @@ for i in range(env.height):
     print("]")
 
 print()
-print()
+print("Difference between true value and estimated")
 
 for i in range(env.height):
     print("[", end=" ")

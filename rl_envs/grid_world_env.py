@@ -31,8 +31,7 @@ class GridWorldEnv():
         self._action_space = [(-1,0),(0, 1),(1, 0),(0, -1),(0,0)]
         self.action_mappings = [" ↑ "," → "," ↓ ", " ← "," ↺ "]
         self._state_ind_change = [-width,1,width,-1,0] # state index change based on action
-        self.possible_actions = len(self._action_space)
-        self.nA = self.possible_actions
+        self.action_n = len(self._action_space)
         #  model-based 的初始化
         self.transition_probs = defaultdict(lambda: defaultdict(float))
         self.expected_rewards = defaultdict(lambda: defaultdict(float))
@@ -84,7 +83,7 @@ class GridWorldEnv():
     def index_to_state(self, index):
         return (index // self.width, index % self.width)
     def valid_actions(self, state):
-        return self.possible_actions
+        return self.action_n
 
     def step(self, state, a):
         i, j = state

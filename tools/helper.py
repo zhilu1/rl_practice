@@ -2,6 +2,7 @@ import numpy as np
 from collections import namedtuple
 from matplotlib import pyplot as plt
 import gymnasium as gym
+from rl_envs.gym_grid_world_env import GridWorldEnv
 
 
 def plot_value_function(V, title="Value Function", block=False):
@@ -54,7 +55,6 @@ def plot_value_function(V, title="Value Function", block=False):
 
 
 def print_actions(agent, env, get_optimal=False):
-    # action_mapping = [" ↓ "," ↑ "," → "," ← "," ↺ "]
     for i in range(env.height):
         print("[", end=" ")
         for j in range(env.width):
@@ -120,3 +120,62 @@ def visualize_in_gym(agent, env_name="", inp_env=None, steps=1000):
 
     if not inp_env:
         demo_env.close()
+
+def compute_state_value(height, width, env: GridWorldEnv, policy, in_place=True, discount=0.9):
+    """
+    用 Bellman 公式计算精准的 state value 
+    (当然理论上是需要无穷多步才能达到, 但我们规定只要更新幅度小于 delta 就算精准)
+    """
+    env.initialize_model_based()
+    new_state_values = np.zeros((height, width))
+    iteration = 0
+    while iteration < 1000:
+        if in_place:
+            state_values = new_state_values
+        else:
+            state_values = new_state_values.copy()
+        old_state_values = state_values.copy()
+
+        for i in range(height):
+            for j in range(width):
+                state = (i, j)
+                value = 0
+                for action in range(env.action_n):
+                    q_val = 0
+                    for prob, reward in env.Prsa[state][action]:
+                        q_val += reward * prob
+                    for prob, next_state in env.Pssa[state][action]:
+                        q_val += discount * (old_state_values[next_state[0],next_state[1]] * prob)
+                    value += policy[state][action] * q_val
+                new_state_values[i, j] = value
+
+        max_delta_value = abs(old_state_values - new_state_values).max()
+        if max_delta_value < 1e-5:
+            break
+
+        iteration += 1
+
+    return new_state_values, iteration
+
+def gridworld_demo(agent, forbidden_reward=-1, hit_wall_reward=-1, target_reward=1):
+    env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=[(1,1), (1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
+    obs, _ = env.reset()
+    total_reward = 0
+    routine = [obs['agent']]
+    for i in range(500):
+        obs = tuple(obs['agent'])
+        action = agent.get_action(obs)
+        obs, reward, terminated, truncated, info  = env.step(action)
+        # VecEnv resets automatically
+        total_reward += reward
+        routine.append(obs['agent'])
+        if terminated or truncated:
+            obs, _ = env.reset()
+            print('reward: {}, distance: {}'.format(total_reward, routine))
+            total_reward = 0
+            routine = [obs['agent']]
+            if truncated:
+                print("TRUNCATE")
+            else:
+                print("TERMINATE")
+    env.close()

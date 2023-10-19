@@ -44,12 +44,12 @@ def calculate_state_value_error(env,agent):
             for j in range(env.width):
                 state = torch.tensor((i,j), dtype=torch.float).unsqueeze(0)
                 output = agent.policy_net(state)
-                state_value = output.sum()/env.possible_actions
+                state_value = output.sum()/env.action_n
                 state_value_error += (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
     return state_value_error
 
 env = GridWorldEnv(5, 5, forbidden_grids=[(1,1),(1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=-1, hit_wall_reward=-1, target_reward=10)
-agent = DeepQLearningAgent(state_space_n= 2, action_space_n=env.possible_actions, lr = LEARN_RATE)
+agent = DeepQLearningAgent(state_space_n= 2, action_space_n=env.action_n, lr = LEARN_RATE)
 writer = SummaryWriter()
 """
 generate samples to replay buffer
@@ -83,7 +83,7 @@ for _ in range(200):
 
         loss, q_value, target_value = agent.update_Q_network(state, action_indices, reward, next_state, env.discounted_factor)
     # copy target network every C=5 iteration
-    # state_value_estimated = output.sum(dim=1) / env.possible_actions 
+    # state_value_estimated = output.sum(dim=1) / env.action_n 
     writer.add_scalar('TD error', (q_value - target_value).sum(), iter_counter)         
     writer.add_scalar('Loss', loss.sum(), iter_counter)
     writer.add_scalar('State value error', calculate_state_value_error(env,agent), iter_counter)
@@ -107,7 +107,7 @@ for i in range(env.height):
     for j in range(env.width):
         state = torch.tensor((i,j), dtype=torch.float).unsqueeze(0)
         output = agent.policy_net(state)
-        state_value = output.sum()/env.possible_actions
+        state_value = output.sum()/env.action_n
         state_value_error = (state_value - TRUE_RANDOM_STATE_VALUE[i][j])
         print(state_value_error, end=" ")
     print("]")

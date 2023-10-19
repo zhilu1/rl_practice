@@ -100,15 +100,10 @@ class DeepQLearningAgent:
                 raise ValueError("Iterables have different lengths")
             yield combo
 
-        # target_net_state_dict = self.target_net.state_dict()
-        # policy_net_state_dict = self.policy_net.state_dict()
-        # for key in policy_net_state_dict:
-        #     target_net_state_dict[key] = policy_net_state_dict[key]*self.TAU + target_net_state_dict[key]*(1-self.TAU)
-        # self.target_net.load_state_dict(target_net_state_dict)
-        # return self.QNetStruct
-    # def encoding_state_action(self, state, action):
-        # state 和 action, 假如都是离散的, 可以直接 one_hot encoding
-        # 假如都是连续的, 那么就直接输入给神经网络似乎也可以
-        # 考虑到 grid world 环境 state 是有上下关系的, 那么可以 state 直接作为有顺序的数字 encode, action 则 one_hot encoding
-        # 后注: 上面的想法都不必要, 实际上用 state 输入 而非 (s,a) pair, 然后同时输出多个 action 的 action value
-
+    def generate_Q_table(self, height, width):
+        Q = {}
+        for y in range(height):
+            for x in range(width):
+                q_values = self.policy_net((y,x))
+                Q[(y,x)] = q_values
+        return Q
