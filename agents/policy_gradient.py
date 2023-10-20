@@ -7,6 +7,23 @@ from torch import optim
 from collections import defaultdict
 import numpy as np
 
+class PolicyNet(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(kwargs['in_dim'], 128)
+        self.fc2 = nn.Linear(128, 32)
+        self.fc3 = nn.Linear(32, kwargs['out_dim'])
+    def forward(self, inp):
+        out1 = self.fc1(inp)
+        out1 = torch.nn.functional.relu(out1)
+        out2 = self.fc2(out1)
+        out2 = torch.nn.functional.relu(out2)
+        out3 = self.fc3(out2)
+        out3 = torch.nn.functional.relu(out3)
+        probs = torch.nn.functional.softmax(out3, dim=-1)
+        return probs
+
+
 class PGAgent:
     def __init__(self,
                  state_space_n,
@@ -15,10 +32,12 @@ class PGAgent:
                  discounted_factor = 0.9
                  ) -> None:
         self.action_space = action_space_n
-        self.policy_net = self.initialize_network(state_space_n, 128, self.action_space)
+        # self.policy_net = self.initialize_network(state_space_n, 128, self.action_space)
+        self.policy_net = PolicyNet(in_dim=state_space_n, out_dim=self.action_space)
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True) # 输入 state, 输出每个 action 的概率
         self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
-        self.q = defaultdict(lambda: np.zeros(self.action_space))
+        self.q = defaultdict(lambda: defaultdict(lambda: -100))
+        self.v = defaultdict(lambda: -100)
         self.discounted_factor = discounted_factor
     def initialize_network(self, in_feature, hidden_dim, out_dim):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
@@ -41,7 +60,7 @@ class PGAgent:
         # action_probs = (actions_val/actions_val.sum()).detach().numpy()
         if optimal:
             return torch.argmax(action_probs).item()
-        action = np.random.choice(len(action_probs),1,p=action_probs.numpy())
+        action = np.random.choice(len(action_probs),1,p=action_probs.numpy())[0]
         return action
         # index = action_probs.multinomial(num_samples=1, replacement=True)
         # return index.item()

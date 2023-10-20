@@ -157,12 +157,14 @@ def compute_state_value(height, width, env: GridWorldEnv, policy, in_place=True,
 
     return new_state_values, iteration
 
-def gridworld_demo(agent, forbidden_reward=-1, hit_wall_reward=-1, target_reward=1):
-    env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=[(1,1), (1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
+def gridworld_demo(agent, env, repeat_times):
+    env.render_mode = "human"
+    # env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=in_env.forbidden_grids, target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
+    # env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=[(1,1), (1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
     obs, _ = env.reset()
     total_reward = 0
     routine = [obs['agent']]
-    for i in range(500):
+    for i in range(repeat_times):
         obs = tuple(obs['agent'])
         action = agent.get_action(obs, optimal=True)
         obs, reward, terminated, truncated, info  = env.step(action)
@@ -178,4 +180,5 @@ def gridworld_demo(agent, forbidden_reward=-1, hit_wall_reward=-1, target_reward
                 print("TRUNCATE")
             else:
                 print("TERMINATE")
-    env.close()
+    env.render_mode = None
+    # env.close()
