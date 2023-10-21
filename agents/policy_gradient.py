@@ -32,21 +32,24 @@ class PGAgent:
                  discounted_factor = 0.9
                  ) -> None:
         self.action_space = action_space_n
-        # self.policy_net = self.initialize_network(state_space_n, 128, self.action_space)
-        self.policy_net = PolicyNet(in_dim=state_space_n, out_dim=self.action_space)
-        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=lr, amsgrad=True) # 输入 state, 输出每个 action 的概率
+        self.policy_net = self.initialize_network(state_space_n, 128, self.action_space)
+        # self.policy_net = PolicyNet(in_dim=state_space_n, out_dim=self.action_space)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr) # 输入 state, 输出每个 action 的概率
         self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
         self.q = defaultdict(lambda: defaultdict(lambda: -100))
         self.v = defaultdict(lambda: -100)
         self.discounted_factor = discounted_factor
+        self.saved_log_probs = []
     def initialize_network(self, in_feature, hidden_dim, out_dim):
         # `in_feature` input feature dim depends on encoding  of (state, action) pair
         net_struct = nn.Sequential(
                     nn.Linear(in_feature, hidden_dim),
+                    nn.Dropout(0.5),
                     nn.ReLU(),
-                    nn.Linear(hidden_dim, 64),
+                    nn.Linear(hidden_dim, hidden_dim//2),
+                    nn.Dropout(0.5),
                     nn.ReLU(),
-                    nn.Linear(64,out_dim),
+                    nn.Linear(hidden_dim//2,out_dim),
                     nn.Softmax(dim=-1)
                 )
         return net_struct
@@ -54,14 +57,17 @@ class PGAgent:
     def get_behavior_action(self, state):
         return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
     def get_action(self, state, optimal=False):
-        with torch.no_grad():
-            state = torch.tensor(state, dtype=torch.float)
-            action_probs = self.policy_net(state)
+        # with torch.no_grad(): # 哪里都 no_grad 只会害了你 
+        state = torch.tensor(state, dtype=torch.float).unsqueeze(0)
+        action_probs = self.policy_net(state)
         # action_probs = (actions_val/actions_val.sum()).detach().numpy()
         if optimal:
             return torch.argmax(action_probs).item()
-        action = np.random.choice(len(action_probs),1,p=action_probs.numpy())[0]
-        return action
+        m = torch.distributions.Categorical(action_probs)
+        action = m.sample()
+        self.saved_log_probs.append(m.log_prob(action))
+        # action = np.random.choice(len(action_probs),1,p=action_probs.numpy())[0]
+        return action.item()
         # index = action_probs.multinomial(num_samples=1, replacement=True)
         # return index.item()
         # return np.random.choice(len(action_probs),1,p=action_probs)[0]
