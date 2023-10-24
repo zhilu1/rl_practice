@@ -2,7 +2,7 @@ import numpy as np
 from collections import namedtuple
 from matplotlib import pyplot as plt
 import gymnasium as gym
-from rl_envs.gym_grid_world_env import GridWorldEnv
+from rl_envs.new_gym_grid_world_env import GridWorldEnv
 
 
 def plot_value_function(V, title="Value Function", block=False):
@@ -104,19 +104,23 @@ def visualize_in_gym(agent, env_name="", inp_env=None, steps=1000):
     another possible solution can be gymnasium.experimental.wrappers.RecordVideoV0
     """
     if inp_env:
+        inp_env.render_mode = "human"
+        # inp_env.render_mode="human"
         demo_env = inp_env
     else:
         demo_env = gym.make(env_name, render_mode="human")
     observation, info = demo_env.reset()
 
     for _ in range(steps):
+        observation = (observation,)
         action = agent.get_action(
-            observation
+            observation, optimal=True
         )  # agent policy that uses the observation and info
         # insert an algorithm that can interact with env and output an action here
         observation, reward, terminated, truncated, info = demo_env.step(action)
         if terminated or truncated:
             observation, info = demo_env.reset()
+            print(steps)
 
     if not inp_env:
         demo_env.close()
@@ -157,7 +161,7 @@ def compute_state_value(height, width, env: GridWorldEnv, policy, in_place=True,
 
     return new_state_values, iteration
 
-def gridworld_demo(agent, env, repeat_times):
+def gridworld_demo(agent, env, repeat_times: int = 500):
     env.render_mode = "human"
     # env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=in_env.forbidden_grids, target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
     # env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=[(1,1), (1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
@@ -165,7 +169,7 @@ def gridworld_demo(agent, env, repeat_times):
     total_reward = 0
     routine = [obs['agent']]
     for i in range(repeat_times):
-        obs = tuple(obs['agent'])
+        # obs = tuple(obs['agent'])
         action = agent.get_action(obs, optimal=True)
         obs, reward, terminated, truncated, info  = env.step(action)
         # VecEnv resets automatically

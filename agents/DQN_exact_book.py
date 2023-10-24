@@ -120,8 +120,8 @@ class DeepQLearningAgent:
         # q_star = torch.max(q_value_target, dim=1, keepdim=True)[0]
         # target_value = (reward + self.discounted_factor * q_star).squeeze()
         """
-        # 计算 TD-target, 因为 batch 的存在, 需要做一些维度上的操作
-        # WARNING: 错误看起来就是在这里这部分, 稍等之前我似乎是忘记把这里的action normalize 了?
+        计算 TD-target, 因为 batch 的存在, 需要做一些维度上的操作
+        WARNING: 错误看起来就是在这里这部分, 稍等之前我似乎是忘记把这里的action normalize 了?
         问题找到了: 此前 next_state.repeat(5, 1) 是整个一块地复制, 导致 reshape 时的 连续 5 行 state 是不同的
         [[1,2],
          [3,4]] 

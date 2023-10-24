@@ -23,13 +23,7 @@ class GridWorldEnv(gym.Env):
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2, i.e. MultiDiscrete([size, size]).
-        self.observation_space = spaces.Dict(
-            {
-                "agent": spaces.Box(0, size - 1, shape=(2,), dtype=float),
-                "target": spaces.Box(0, size - 1, shape=(len(target_grids),2,), dtype=float),
-                "forbidden": spaces.Box(0, size - 1, shape=(len(forbidden_grids),2,), dtype=float),
-            }
-        )
+        self.observation_space = spaces.Box(0, size - 1, shape=(2,), dtype=float)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "stay"
         self.action_space = spaces.Discrete(4)
@@ -83,7 +77,7 @@ class GridWorldEnv(gym.Env):
         self._has_seed = seed
 
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location, "forbidden": self._forbidden_location}
+        return self._agent_location
 
     def _get_info(self):
         return {
