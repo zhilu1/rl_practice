@@ -111,16 +111,17 @@ def visualize_in_gym(agent, env_name="", inp_env=None, steps=1000):
         demo_env = gym.make(env_name, render_mode="human")
     observation, info = demo_env.reset()
 
-    for _ in range(steps):
+    for t in range(steps):
         observation = (observation,)
         action = agent.get_action(
-            observation, optimal=True
+            observation
+            , optimal=True
         )  # agent policy that uses the observation and info
         # insert an algorithm that can interact with env and output an action here
         observation, reward, terminated, truncated, info = demo_env.step(action)
-        if terminated or truncated:
+        if terminated or truncated or steps % 100 == 99:
             observation, info = demo_env.reset()
-            print(steps)
+            print(t)
 
     if not inp_env:
         demo_env.close()
@@ -167,19 +168,19 @@ def gridworld_demo(agent, env, repeat_times: int = 500):
     # env = GridWorldEnv(fixed_map = True, render_mode="human", forbidden_grids=[(1,1), (1,2), (2,2),(3,1),(3,3),(4,1)], target_grids=[(3,2)], forbidden_reward=forbidden_reward, hit_wall_reward=hit_wall_reward, target_reward=target_reward)
     obs, _ = env.reset()
     total_reward = 0
-    routine = [obs['agent']]
+    routine = [obs]
     for i in range(repeat_times):
-        # obs = tuple(obs['agent'])
+        # obs = tuple(obs)
         action = agent.get_action(obs, optimal=True)
         obs, reward, terminated, truncated, info  = env.step(action)
         # VecEnv resets automatically
         total_reward += reward
-        routine.append(obs['agent'])
+        routine.append(obs)
         if terminated or truncated:
             obs, _ = env.reset()
             print('reward: {}, distance: {}'.format(total_reward, routine))
             total_reward = 0
-            routine = [obs['agent']]
+            routine = [obs]
             if truncated:
                 print("TRUNCATE")
             else:

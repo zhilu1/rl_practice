@@ -6,7 +6,37 @@ import torch
 from rl_envs.gym_grid_world_env import GridWorldEnv
 from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter # type: ignore
-
+class PolicyNet(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
+        self.height = kwargs['height']
+        self.width = kwargs['width']
+        self.observation_space = self.height * self.width
+        self.fc1 = nn.Linear(self.observation_space, kwargs['out_dim'])
+        torch.nn.init.zeros_(self.fc1.weight)
+    def forward(self, inp):
+        sq_inp = inp[0] * self.width + inp[1]
+        out = torch.tensor(sq_inp, dtype=torch.int64)
+        out1 = torch.nn.functional.one_hot(out, self.observation_space).to(torch.float).unsqueeze(0)
+        out3 = self.fc1(out1)
+        probs = torch.nn.functional.softmax(out3, dim=-1)
+        return probs
+class ValueNet(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
+        # self.fc1 = nn.Linear(kwargs['in_dim'], 1)
+        self.height = kwargs['height']
+        self.width = kwargs['width']
+        self.observation_space = self.height * self.width
+        self.fc1 = nn.Linear(self.observation_space, 1)
+        # self.observation_space = kwargs['in_dim']
+        torch.nn.init.zeros_(self.fc1.weight)
+    def forward(self, inp):
+        sq_inp = inp[0] * self.width + inp[1]
+        out = torch.tensor(sq_inp, dtype=torch.int64)
+        out1 = torch.nn.functional.one_hot(out, self.observation_space).to(torch.float).unsqueeze(0)
+        out3 = self.fc1(out1)
+        return out3
 class A2CAgent:
     """
     The simplest actor-critic algorithm (QAC) 
@@ -16,44 +46,64 @@ class A2CAgent:
                 state_space,
                 action_space,
                 lr_policy = 0.001,
-                lr_q = 0.0015,
-                discounted_factor = 0.9
+                lr_v = 0.0015,
+                discounted_factor = 0.9,
+                height = 3,
+                width = 3,
                 ) -> None:
         
         self.lr_policy = lr_policy
-        self.lr_q = lr_q
+        self.lr_v = lr_v
         self.state_space = state_space
         self.action_space = action_space
         self.discounted_factor = discounted_factor
 
-        self.policy_net = self.initialize_policy_net(input_dim=state_space, output_dim=action_space)
+        self.policy_net = PolicyNet(in_dim=state_space, out_dim=action_space, height=height, width=width)
         # self.v_net = self.initialize_v_net(input_dim=state_space, output_dim=action_space)
-        self.v_net = self.initialize_v_net(input_dim=state_space, output_dim=1)
+        self.value_net = ValueNet(in_dim=state_space, out_dim=1, height=height, width=width)
 
-        self.optimizer_p = torch.optim.Adam(self.policy_net.parameters(), lr=lr_policy)
-        self.optimizer_v = torch.optim.Adam(self.v_net.parameters(), lr=lr_q)
 
-    def initialize_policy_net(self, input_dim, output_dim):
-        policy_netstruct = nn.Sequential(
-            nn.Linear(in_features=input_dim, out_features=100),
-            nn.ReLU(),
-            nn.Linear(in_features=100, out_features=output_dim),
-            nn.Softmax(dim=-1)
-        )
-        return policy_netstruct
-    
-    def initialize_v_net(self, input_dim, output_dim):
-        v_netstruct = nn.Sequential(
-            nn.Linear(in_features=input_dim, out_features=64),
-            nn.ReLU(),
-            # nn.Linear(in_features=128, out_features=64),
-            # nn.ReLU(),
-            nn.Linear(in_features=64, out_features=32),
-            nn.ReLU(),
-            nn.Linear(in_features=32, out_features=output_dim),
-        )
-        return v_netstruct
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr_policy) # 输入 state, 输出每个 action 的概率
+        self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr_v) # 输入 state, 输出每个 action 的概率
+        self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
+        self.q = defaultdict(lambda: defaultdict(lambda: -100))
+        self.v = defaultdict(lambda: -100)
+        self.discounted_factor = discounted_factor
+        self.saved_log_probs = []
+        self.saved_log_prob = 0
+        self.first_occ_set = set()
+    def initialize_network(self, in_feature, hidden_dim, out_dim):
+        # `in_feature` input feature dim depends on encoding  of (state, action) pair
+        net_struct = nn.Sequential(
+                    nn.Linear(in_feature,  out_dim),
+                    # nn.Dropout(0.5),
+                    # nn.ReLU(),
+                    # nn.Linear(hidden_dim, hidden_dim//2),
+                    # nn.Dropout(0.5),
+                    # nn.ReLU(),
+                    # nn.Linear(hidden_dim//2,out_dim),
+                    nn.Softmax(dim=-1)
+                )
+        return net_struct
 
+    def get_behavior_action(self, state):
+        return np.random.choice(len(self.behavior_policy[state]),1,p=self.behavior_policy[state])[0] # random choose an action based on policy
+    def get_action(self, in_state, optimal=False):
+        # with torch.no_grad(): # 哪里都 no_grad 只会害了你 
+        # state = torch.tensor(in_state, dtype=torch.int64)
+        # state = torch.nn.functional.one_hot(state, 48)
+        # with torch.no_grad():
+        action_probs = self.policy_net(in_state)
+        # action_probs = (actions_val/actions_val.sum()).detach().numpy()
+        if optimal:
+            return torch.argmax(action_probs).item()
+        m = torch.distributions.Categorical(action_probs)
+        action = m.sample()
+
+        logProb = m.log_prob(action)
+        self.saved_log_prob = logProb
+        self.saved_log_probs.insert(0, logProb)
+        return action.item()
     def generate_policy_table(self, height, width):
         """
         only for debug use, AC doesn't own nor need a real policy table
@@ -61,80 +111,8 @@ class A2CAgent:
         policy = {}
         for y in range(height):
             for x in range(width):
-                state = torch.tensor((y,x), dtype=torch.float).unsqueeze(0)
+                state = torch.tensor((y,x), dtype=torch.float)
                 policy_prob = self.policy_net(state)
                 policy[(y,x)] = policy_prob.detach().numpy()
         return policy
-    def generate_v_table(self, height, width):
-        """
-        only for debug use, AC doesn't own nor need a real V table
-        """
-        V = {}
-        for y in range(height):
-            for x in range(width):
-                state = torch.tensor((y,x), dtype=torch.float).unsqueeze(0)
-                state_value = self.v_net(state)
-                V[(y,x)] = state_value.detach().numpy()
-        return V
-
-    def RUN(self, env:GridWorldEnv):
-        writer = SummaryWriter()
-        epochs = 100
-        episode_len = 1000
-        iter_counter = 0
-        for episode in range(epochs):
-            obs, _ = env.reset()
-            next_state = torch.tensor(obs['agent'], dtype = torch.float)
-            total_reward  = 0
-            for _ in range(episode_len):
-                # generate (state, action, reward, next_state, next_action)
-                state = next_state
-                action_probs = self.policy_net(state)
-                # action = torch.max(action_probs, dim=-1).indices
-                # choose action based on policy
-                m = Categorical(action_probs)
-                action = m.sample()
-                obs, reward, terminated , truncated, info = env.step(action)
-                next_state = torch.tensor(obs['agent'], dtype = torch.float)
-                # next_action = torch.max(self.policy_net(next_state), dim=-1).indices
-
-
-                v_values = self.v_net(state)
-                TD_error = reward + self.discounted_factor * self.v_net(next_state) - v_values
-
-                # Actor: policy update
-                self.optimizer_p.zero_grad()
-                loss_actor = TD_error * -torch.log(action_probs[action]) # loss 或有问题
-                loss_actor.sum().backward(retain_graph=True) # 这里这样是否会出问题
-                torch.nn.utils.clip_grad.clip_grad_norm_(self.policy_net.parameters(), 100)
-                self.optimizer_p.step()
-
-
-
-                # Critic: value update
-                self.optimizer_v.zero_grad()
-                loss_critic = TD_error * v_values
-                loss_critic.sum().backward()
-                torch.nn.utils.clip_grad.clip_grad_norm_(self.v_net.parameters(), 100)
-                self.optimizer_v.step()
-
-                writer.add_scalar('loss_critic', loss_critic.sum(), iter_counter)
-                writer.add_scalar('loss_actor', loss_actor.sum(), iter_counter)
-                total_reward += reward
-                iter_counter += 1
-
-            writer.add_scalar('reward', total_reward, episode)
-            writer.flush()
-        writer.close()
-
-
-
-
-
-
-
-
-
-
-
 
