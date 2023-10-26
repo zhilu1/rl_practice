@@ -33,16 +33,18 @@ class A2CAgent:
     def __init__(self,
                  state_space_n,
                  action_space_n,
-                 lr: float = 0.01,
-                 lr_v: float = 0.1,
-                 discounted_factor = 0.9
+                lr_policy = 0.001,
+                lr_v = 0.0015,
+                 discounted_factor = 0.9,
+                 save_action = False
                  ) -> None:
         self.action_space = action_space_n
+        self.save_actionprob = save_action
         # self.policy_net = self.initialize_network(state_space_n, 128, self.action_space)
         self.policy_net = PolicyNet(in_dim=state_space_n, out_dim=self.action_space)
         self.value_net = ValueNet(in_dim=state_space_n, out_dim=self.action_space)
 
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr) # 输入 state, 输出每个 action 的概率
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr_policy) # 输入 state, 输出每个 action 的概率
         self.optimizer_v = optim.Adam(self.value_net.parameters(), lr=lr_v) # 输入 state, 输出每个 action 的概率
         self.behavior_policy = defaultdict(lambda: np.ones(self.action_space) * (1/self.action_space))
         self.q = defaultdict(lambda: defaultdict(lambda: -100))
@@ -79,9 +81,10 @@ class A2CAgent:
         m = torch.distributions.Categorical(action_probs)
         action = m.sample()
 
-        logProb = m.log_prob(action)
-        self.saved_log_prob = logProb
-        self.saved_log_probs.insert(0, logProb)
+        if self.save_actionprob:
+            logProb = m.log_prob(action)
+            self.saved_log_prob = logProb
+            self.saved_log_probs.insert(0, logProb)
         return action.item()
 
 

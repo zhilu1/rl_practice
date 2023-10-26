@@ -50,7 +50,9 @@ class A2CAgent:
                 discounted_factor = 0.9,
                 height = 3,
                 width = 3,
-                ) -> None:
+                save_action = False
+                 ) -> None:
+        self.save_actionprob = save_action
         
         self.lr_policy = lr_policy
         self.lr_v = lr_v
@@ -100,9 +102,10 @@ class A2CAgent:
         m = torch.distributions.Categorical(action_probs)
         action = m.sample()
 
-        logProb = m.log_prob(action)
-        self.saved_log_prob = logProb
-        self.saved_log_probs.insert(0, logProb)
+        if self.save_actionprob:
+            logProb = m.log_prob(action)
+            self.saved_log_prob = logProb
+            self.saved_log_probs.insert(0, logProb)
         return action.item()
     def generate_policy_table(self, height, width):
         """
