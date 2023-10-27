@@ -53,9 +53,10 @@ class ApproxQLearningAgent:
     def update_parameters(self, TD_error, state, action, next_state, best_action):
         # 可以在 update parameters 时顺便算出所有 state, action 的 phisa 并存储
         for i, param in enumerate(self.parameters):
-            gradient = self.phi_sa(
-                next_state, best_action, i
-            ) * self.discounted_factor - self.phi_sa(state, action, i)
+            # gradient = self.phi_sa(
+            #     next_state, best_action, i
+            # ) * self.discounted_factor - self.phi_sa(state, action, i)
+            gradient = self.phi_sa(state, action, i)
             self.parameters[i] += self.learning_rate * (2 * TD_error * gradient)
 
     def policy_improvement(self, state):
@@ -88,14 +89,18 @@ class ApproxQLearningAgent:
             next_state, reward, terminated, truncated, info = env.step(action)
             episode_recorder.append(
                 (
-                    (state[0] / float(env.height), state[1] / float(env.width)),
-                    action / env.action_n,
+                    tuple(state),
+                    action,
                     reward,
-                    (
-                        next_state[0] / float(env.height),
-                        next_state[1] / float(env.width),
-                    ),
+                    tuple(next_state),
                 )
+                # (state[0] / float(env.height), state[1] / float(env.width)),
+                # action / env.action_n,
+                # reward,
+                # (
+                #     next_state[0] / float(env.height),
+                #     next_state[1] / float(env.width),
+                # ),
             )
 
         for i_episode in range(num_episodes):
@@ -117,4 +122,6 @@ class ApproxQLearningAgent:
                 self.update_parameters(
                     TD_error, state, action, next_state, best_action
                 )  # loss is MSE(TD_target, q_value)
-                self.policy_improvement(state)
+        for y in range(env.height):
+            for x in range(env.width):
+                self.policy_improvement((y, x))
