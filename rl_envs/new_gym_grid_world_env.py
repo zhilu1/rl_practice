@@ -11,9 +11,10 @@ class GridWorldEnv(gym.Env):
                 fixed_map = True,
                 forbidden_grids=[], 
                 target_grids=[], 
-                target_reward = 1.0,
-                forbidden_reward = -1.0, 
-                hit_wall_reward = -1.0,
+                target_reward = 1.0, # 进入目标格子
+                forbidden_reward = -1.0, # 进入禁止格子
+                hit_wall_reward = -1.0, # 撞墙
+                normal_reward = 0, # 普通格子
                 seed = None
                 ):
         self.size = size  # The size of the square grid
@@ -39,6 +40,8 @@ class GridWorldEnv(gym.Env):
         self.target_reward = target_reward
         self.forbidden_reward = forbidden_reward
         self.hit_wall_reward = hit_wall_reward
+        self.normal_reward = normal_reward
+
         self.max_steps = 100 # maximum step in a run until truncate
         self.num_step = 0 # step counter
 
@@ -140,7 +143,7 @@ class GridWorldEnv(gym.Env):
             reward = self.hit_wall_reward
         else:
             self._agent_location = new_loc
-            reward = self.target_reward if terminated else 0  # Binary sparse rewards
+            reward = self.target_reward if terminated else self.normal_reward  # Binary sparse rewards
             reward = self.forbidden_reward if any(np.equal(self._forbidden_location,self._agent_location).all(1)) else reward
             
         observation = self._get_obs()
@@ -151,8 +154,8 @@ class GridWorldEnv(gym.Env):
 
         self.num_step+=1
         truncated = False
-        if self.num_step > self.max_steps:
-            truncated = True
+        # if self.num_step > self.max_steps:
+        #     truncated = True
 
         return observation, reward, terminated , truncated, info
 

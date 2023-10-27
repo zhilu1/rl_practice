@@ -135,7 +135,7 @@ iter_counter = 0
 agent = QLearningAgent(env.action_n)
 
 for episode_ind in range(1): # 5 episode
-    state = env.get_random_start()
+    state,_ = env.reset()
     for step_ind in range(10000): # 10000 steps each episode
         action = agent.get_action(state)
         next_state, reward = env.step(state, action)

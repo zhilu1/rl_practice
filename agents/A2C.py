@@ -119,3 +119,15 @@ class A2CAgent:
                 policy[(y,x)] = policy_prob.detach().numpy()
         return policy
 
+    def generate_v_table(self, height, width):
+        """
+        only for debug use, AC doesn't own nor need a real V table
+        """
+        V = {}
+        for y in range(height):
+            for x in range(width):
+                state = torch.tensor((y,x), dtype=torch.float)
+                state_value = self.value_net(state)
+                V[(y,x)] = state_value.detach().numpy()
+        return V
+    

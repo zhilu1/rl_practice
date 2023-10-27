@@ -35,7 +35,7 @@ start at somewhere and find optimal path using n-step Sarsa
 #         for reward in reversed(rewards_ls):
 #             td_target *= env.discounted_factor
 #             td_target += reward
-        
+
 #         td_target += agent.q[next_state][next_action]
 #         # agent.update_q(state, action, reward, next_state, next_action, env.discounted_factor)
 #         agent.td_learn(state, action, td_target)
