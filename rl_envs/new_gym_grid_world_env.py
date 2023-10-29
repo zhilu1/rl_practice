@@ -27,7 +27,7 @@ class GridWorldEnv(gym.Env):
         self.observation_space = spaces.Box(0, size - 1, shape=(2,), dtype=float)
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "stay"
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(5)
         self.action_n = int(self.action_space.n)
 
         

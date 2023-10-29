@@ -93,23 +93,21 @@ class ApproxQLearningAgent:
 
     def RUN(self, env: GridWorldEnv, num_episodes=1000, episode_len=100000):
         writer = SummaryWriter()
-        next_state, _ = env.reset()
-        episode_recorder = []
         """
         collect replay experience
         """
-        for _ in range(episode_len):
-            state = next_state
-            action = env.action_space.sample()
-            next_state, reward, terminated, truncated, info = env.step(action)
-            episode_recorder.append(
-                (
-                    tuple(state),
-                    action,
-                    reward,
-                    tuple(next_state),
-                )
-            )
+        # for _ in range(episode_len):
+        #     state = next_state
+        #     action = env.action_space.sample()
+        #     next_state, reward, terminated, truncated, info = env.step(action)
+        #     episode_recorder.append(
+        #         (
+        #             tuple(state),
+        #             action,
+        #             reward,
+        #             tuple(next_state),
+        #         )
+        #     )
         """
         # input normalization                 
         (state[0] / float(env.height), state[1] / float(env.width)),
@@ -120,8 +118,25 @@ class ApproxQLearningAgent:
             next_state[1] / float(env.width),
         ),"""
 
+        episode_rewards = defaultdict(float)
+        TD_error = 0
         for i_episode in range(num_episodes):
-            shuffle(episode_recorder)
+            episode_recorder = []
+            next_state, _ = env.reset()
+            # 首先, 根据 policy 生成 episode
+            for t in itertools.count():
+                state = next_state
+                action = self.get_action(state)  
+                next_state, reward, terminated, truncated, info = env.step(action)
+                episode_recorder.append((state, action, reward, next_state))
+                # Update statistics
+                episode_rewards[i_episode] += reward
+                if terminated or truncated or reward == -10:
+                    """
+                    特别注意这里 reward == -10, 也就是进入 forbidden grid 的时候也同样会中止并 reset 环境.
+                    经实验发现, 这个时候中止相比于持续能够更容易收敛 (不提前中止的方案达到收敛需要大约 10 倍的训练 episodes)
+                    """
+                    break
             for i_step, (state, action, reward, next_state) in enumerate(
                 episode_recorder
             ):
@@ -142,13 +157,13 @@ class ApproxQLearningAgent:
                 # writer.add_scalar(
                 # "TD error", TD_error, i_episode*episode_len + i_step
                 # )
-            if i_episode % 10 == 0:
-                print("\rEpisode {}/{} ( TD_error: {})".format(
-                    i_episode, num_episodes, TD_error))
+            if i_episode % 100 == 0:
+                print("\r len {} Episode {}/{} ( TD_error: {}, reward: {},{})".format(
+                    t, i_episode, num_episodes, TD_error,  episode_rewards[i_episode], episode_rewards[i_episode - 1]))
 
-        """
-        在结束时更新 policy, 供 get_action 使用
-        """
-        for y in range(env.height):
-            for x in range(env.width):
-                self.policy_improvement((y, x))
+            """
+            在结束时更新 policy, 供 get_action 使用
+            """
+            for y in range(env.height):
+                for x in range(env.width):
+                    self.policy_improvement((y, x))
